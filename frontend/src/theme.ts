@@ -36,7 +36,15 @@ export const theme = createTheme({
         body: {
           backgroundColor: '#060B10',
           backgroundImage: 'radial-gradient(circle at 72% 0, #101d28 0, #060b10 38%)',
+          colorScheme: 'dark',
         },
+        '*': {
+          scrollbarWidth: 'thin',
+          scrollbarColor: '#3A4C5A transparent',
+        },
+        '*::-webkit-scrollbar': { width: 8, height: 8 },
+        '*::-webkit-scrollbar-track': { background: 'transparent' },
+        '*::-webkit-scrollbar-thumb': { background: '#3A4C5A', borderRadius: 8 },
       },
     },
     MuiMenu: {

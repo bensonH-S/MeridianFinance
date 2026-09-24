@@ -5,6 +5,7 @@ import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import pg from 'pg'
 import { classificar, lerPlanilha } from './lib/dda.mjs'
+import { cruzarNotas } from './lib/nfEntrada.mjs'
 
 const root = path.dirname(fileURLToPath(import.meta.url))
 const port = Number(process.env.PORT || 5080)
@@ -34,6 +35,15 @@ const pool = new pg.Pool({
   user: env.DB_USER,
   password: env.DB_PASS,
   database: 'meridian_finance',
+  port: Number(env.DB_PORT || 5432),
+  connectionTimeoutMillis: 10000,
+})
+
+const operacional = new pg.Pool({
+  host: env.DB_HOST,
+  user: env.DB_USER,
+  password: env.DB_PASS,
+  database: env.DB_NAME || 'vision_check',
   port: Number(env.DB_PORT || 5432),
   connectionTimeoutMillis: 10000,
 })
@@ -88,7 +98,31 @@ async function contextoDda() {
   }
 }
 
+async function amarrarNotas() {
+  const despesas = await pool.query(`
+    select d.id, d.numero_nf, coalesce(f.cpf_cnpj, d.cnpj_cedente) as cnpj_fornecedor, eo.cnpj as cnpj_empresa
+    from despesas d
+    join empresas eo on eo.id = d.empresa_origem_id
+    left join fornecedores f on f.id = d.fornecedor_id
+    where d.nf_confirmada = false and d.numero_nf is not null and d.status <> 'cancelada'
+  `)
+  if (!despesas.rowCount) return
+  const notas = await operacional.query(`
+    select n.id_nfe::text as id, n.numero, n.emitente_cnpj, l.cnpj as cnpj_loja
+    from estoque_nfe n
+    join lojas l on l.id_loja = n.id_loja
+    where n.status_entrega = 'conferida'
+  `)
+  for (const cruzamento of cruzarNotas(despesas.rows, notas.rows)) {
+    await pool.query(
+      `update despesas set nf_confirmada = true, nfe_id = $2 where id = $1 and nf_confirmada = false`,
+      [cruzamento.despesa_id, cruzamento.nfe_id],
+    )
+  }
+}
+
 async function listarDespesas(empresaId) {
+  try { await amarrarNotas() } catch (err) { console.error(err.message) }
   const params = []
   let where = ''
   if (empresaId) {
@@ -98,7 +132,7 @@ async function listarDespesas(empresaId) {
   const { rows } = await pool.query(`
     select d.id, d.descricao, d.valor::float8 as valor, to_char(d.vencimento, 'YYYY-MM-DD') as vencimento,
            to_char(d.competencia, 'YYYY-MM-DD') as competencia, d.forma_pagamento, d.status,
-           d.documento_ref, d.empresa_origem_id as origem_id, eo.apelido as origem, eo.razao_social as origem_razao,
+           d.documento_ref, d.numero_nf, d.nf_confirmada, d.empresa_origem_id as origem_id, eo.apelido as origem, eo.razao_social as origem_razao,
            er.apelido as registrado_em,
            d.fornecedor_id, f.nome as fornecedor, d.plano_conta_id, p.nome as plano,
            d.conta_saida_id, cs.nome as conta_nome, cs.empresa_id as conta_empresa_id,
@@ -286,14 +320,16 @@ const server = http.createServer(async (req, res) => {
         await pool.query(`
           insert into despesas (
             descricao, fornecedor_id, empresa_origem_id, plano_conta_id,
-            documento_ref, competencia, vencimento, valor, forma_pagamento, dados_pagamento, status
-          ) values ($1,$2,$3,$4,$5,$6,$7,$8,'boleto',$9,$10)
+            documento_ref, numero_nf, cnpj_cedente, competencia, vencimento, valor, forma_pagamento, dados_pagamento, status
+          ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'boleto',$11,$12)
         `, [
           (linha.cedente || 'Boleto DDA').slice(0, 180),
           linha.fornecedor_id,
           linha.empresa_id,
           linha.plano_conta_id,
           linha.documento_ref,
+          linha.documento || null,
+          linha.cnpj_cedente || null,
           linha.competencia,
           linha.vencimento,
           linha.valor,
@@ -332,7 +368,13 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(port, '127.0.0.1', () => {
   console.log(`meridian-finance http://127.0.0.1:${port}`)
-  pool.query('alter table despesas add column if not exists dados_pagamento text').catch((err) => {
+  pool.query(`
+    alter table despesas add column if not exists dados_pagamento text;
+    alter table despesas add column if not exists numero_nf text;
+    alter table despesas add column if not exists cnpj_cedente text;
+    alter table despesas add column if not exists nfe_id text;
+    alter table despesas add column if not exists nf_confirmada boolean not null default false;
+  `).catch((err) => {
     console.error(err.message)
   })
 })

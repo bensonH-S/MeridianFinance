@@ -11,6 +11,8 @@ export type Despesa = {
   forma_pagamento: string | null
   status: string
   documento_ref: string | null
+  numero_nf: string | null
+  nf_confirmada: boolean
   origem_id: string
   origem: string
   origem_razao: string

@@ -23,6 +23,7 @@ import TableRow from '@mui/material/TableRow'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import AddIcon from '@mui/icons-material/Add'
+import CheckIcon from '@mui/icons-material/Check'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import { api, brl, type Conta, type Despesa, type Empresa, type Fornecedor, type Plano } from '../api'
 
@@ -148,14 +149,14 @@ export function ContasPagarPage() {
         <Table size="small" stickyHeader>
           <TableHead>
             <TableRow>
-              {['Status', 'Descrição', 'Origem', 'Forma de pagamento', 'Código', 'Vencimento', 'Valor', ''].map((h) => (
+              {['Status', 'Descrição', 'Origem', 'Nota fiscal', 'Forma de pagamento', 'Código', 'Vencimento', 'Valor', ''].map((h) => (
                 <TableCell key={h || 'acao'} align={h === 'Valor' ? 'right' : 'left'}>{h}</TableCell>
               ))}
             </TableRow>
           </TableHead>
           <TableBody>
             {linhas.length === 0 && (
-              <TableRow><TableCell colSpan={8} sx={{ color: 'text.secondary', py: 4 }}>Nenhuma despesa nesse filtro.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} sx={{ color: 'text.secondary', py: 4 }}>Nenhuma despesa nesse filtro.</TableCell></TableRow>
             )}
             {linhas.map((e) => (
               <TableRow key={e.id} hover>
@@ -167,6 +168,11 @@ export function ContasPagarPage() {
                   <Typography variant="caption" color="text.secondary">{nota(e) || 'Sem fornecedor'}</Typography>
                 </TableCell>
                 <TableCell>{e.origem}</TableCell>
+                <TableCell>
+                  {e.nf_confirmada
+                    ? <Chip size="small" icon={<CheckIcon />} label="NF confirmada" sx={{ bgcolor: '#1F8A4C', color: '#fff', fontWeight: 600, '& .MuiChip-icon': { color: '#fff' } }} />
+                    : <Chip size="small" label="NF pendente" variant="outlined" sx={{ color: 'text.secondary', borderColor: 'divider' }} />}
+                </TableCell>
                 <TableCell>{CODIGO[e.forma_pagamento || ''] || '—'}</TableCell>
                 <TableCell><Codigo forma={e.forma_pagamento} pagamento={e.pagamento} /></TableCell>
                 <TableCell sx={{ color: aberta(e) && e.vencimento && e.vencimento < hoje ? 'error.main' : 'inherit' }}>
