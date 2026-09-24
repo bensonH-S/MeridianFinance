@@ -42,7 +42,7 @@ const titulos: Record<string, { title: string; subtitle: string }> = {
   '/movimento': { title: 'Contas movimento', subtitle: 'Módulo em desenvolvimento.' },
   '/dre': { title: 'DRE', subtitle: 'Módulo em desenvolvimento.' },
   '/integracoes': { title: 'Integrações', subtitle: 'Módulo em desenvolvimento.' },
-  '/configuracoes': { title: 'Configuração', subtitle: 'Cada assunto na sua tela.' },
+  '/configuracoes': { title: 'Configuração', subtitle: 'Módulo em desenvolvimento.' },
   '/configuracoes/empresas': { title: 'Empresas', subtitle: 'Lojas e holdings.' },
   '/configuracoes/contas': { title: 'Contas bancárias', subtitle: 'Caixa, Banco do Brasil e Itaú.' },
   '/configuracoes/plano': { title: 'Plano de contas', subtitle: 'Classificação do que é a pagar.' },
@@ -82,7 +82,7 @@ export function Shell() {
         >
           <Box
             component="img"
-            src="/logo-central.png?v=6"
+            src={`${import.meta.env.BASE_URL}logo-central.png?v=7`}
             alt="Central GA"
             sx={{ width: '100%', maxHeight: 40, objectFit: 'contain', display: 'block' }}
           />
