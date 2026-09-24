@@ -80,9 +80,10 @@ export function ContasPagarPage() {
   }, [])
 
   const noPeriodo = useMemo(() => despesas.filter((e) => {
-    if (!e.vencimento) return !de && !ate
-    if (de && e.vencimento < de) return false
-    if (ate && e.vencimento > ate) return false
+    const semana = e.competencia || e.vencimento
+    if (!semana) return !de && !ate
+    if (de && semana < de) return false
+    if (ate && semana > ate) return false
     return true
   }), [despesas, de, ate])
 

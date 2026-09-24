@@ -7,6 +7,7 @@ export type Despesa = {
   descricao: string
   valor: number
   vencimento: string | null
+  competencia: string | null
   forma_pagamento: string | null
   status: string
   documento_ref: string | null

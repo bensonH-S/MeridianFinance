@@ -82,7 +82,8 @@ async function listarDespesas(empresaId) {
     where = 'where d.empresa_origem_id = $1'
   }
   const { rows } = await pool.query(`
-    select d.id, d.descricao, d.valor::float8 as valor, to_char(d.vencimento, 'YYYY-MM-DD') as vencimento, d.forma_pagamento, d.status,
+    select d.id, d.descricao, d.valor::float8 as valor, to_char(d.vencimento, 'YYYY-MM-DD') as vencimento,
+           to_char(d.competencia, 'YYYY-MM-DD') as competencia, d.forma_pagamento, d.status,
            d.documento_ref, d.empresa_origem_id as origem_id, eo.apelido as origem, eo.razao_social as origem_razao,
            er.apelido as registrado_em,
            d.fornecedor_id, f.nome as fornecedor, d.plano_conta_id, p.nome as plano,
@@ -222,7 +223,8 @@ const server = http.createServer(async (req, res) => {
         update despesas set
           descricao = $1, fornecedor_id = $2, empresa_origem_id = $3, conta_saida_id = $4, plano_conta_id = $5,
           documento_ref = $6, vencimento = $7, valor = $8, forma_pagamento = $9, dados_pagamento = $10,
-          status = case when $12::text is null then status else $12 end
+          status = case when $12::text is null then status else $12 end,
+          competencia = case when $13::date is null then competencia else $13::date end
         where id = $11
         returning id, status
       `, [
@@ -238,6 +240,7 @@ const server = http.createServer(async (req, res) => {
         body.dados_pagamento ? String(body.dados_pagamento).trim() : null,
         id,
         body.status && ['rascunho', 'classificada', 'pronta'].includes(body.status) ? body.status : null,
+        body.competencia || null,
       ])
       if (!updated.rowCount) return send(res, 404, JSON.stringify({ erro: 'Despesa não encontrada.' }))
       return send(res, 200, JSON.stringify(updated.rows[0]))
