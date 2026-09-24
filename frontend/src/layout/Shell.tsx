@@ -151,6 +151,31 @@ export function Shell() {
             </Box>
           ))}
         </Box>
+        <Box sx={{ px: 1.5, py: 1.5, borderTop: '1px solid #1C2A35', display: 'flex', alignItems: 'center', gap: 1.25 }}>
+          <Box
+            aria-hidden
+            sx={{
+              width: 32,
+              height: 32,
+              borderRadius: '50%',
+              bgcolor: 'rgba(255,90,10,0.16)',
+              color: '#FF5A0A',
+              display: 'grid',
+              placeItems: 'center',
+              fontSize: 13,
+              fontWeight: 600,
+              flexShrink: 0,
+            }}
+          >
+            {sessao.nome.slice(0, 1)}
+          </Box>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography sx={{ fontSize: 13, fontWeight: 600, lineHeight: 1.2 }} noWrap>{sessao.nome}</Typography>
+            <Typography sx={{ fontSize: 12, color: '#8FA0AF', lineHeight: 1.2 }} noWrap>
+              {sessao.papel} · {sessao.versao}
+            </Typography>
+          </Box>
+        </Box>
       </Box>
 
       <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -161,7 +186,6 @@ export function Shell() {
             flexShrink: 0,
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
             gap: 2,
             px: 3,
             borderBottom: '1px solid #1C2A35',
@@ -177,32 +201,8 @@ export function Shell() {
               </Typography>
             )}
           </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, flexShrink: 0 }}>
-            <Box
-              aria-hidden
-              sx={{
-                width: 32,
-                height: 32,
-                borderRadius: '50%',
-                bgcolor: 'rgba(255,90,10,0.16)',
-                color: '#FF5A0A',
-                display: 'grid',
-                placeItems: 'center',
-                fontSize: 13,
-                fontWeight: 600,
-              }}
-            >
-              {sessao.nome.slice(0, 1)}
-            </Box>
-            <Box sx={{ textAlign: 'right' }}>
-              <Typography sx={{ fontSize: 13, fontWeight: 600, lineHeight: 1.2 }}>{sessao.nome}</Typography>
-              <Typography sx={{ fontSize: 12, color: '#8FA0AF', lineHeight: 1.2 }}>
-                {sessao.papel} · {sessao.versao}
-              </Typography>
-            </Box>
-          </Box>
         </Box>
-        <Box component="main" sx={{ flex: 1, minHeight: 0, overflow: 'auto', px: 3, py: 2.5 }}>
+        <Box component="main" sx={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', px: 3, py: 2.5 }}>
           <Outlet />
         </Box>
       </Box>

@@ -101,7 +101,7 @@ async function listarDespesas(empresaId) {
       limit 1
     ) pix on true
     ${where}
-    order by d.created_at desc
+    order by d.vencimento nulls last, d.descricao
   `, params)
   return rows
 }
@@ -221,7 +221,8 @@ const server = http.createServer(async (req, res) => {
       const updated = await pool.query(`
         update despesas set
           descricao = $1, fornecedor_id = $2, empresa_origem_id = $3, conta_saida_id = $4, plano_conta_id = $5,
-          documento_ref = $6, vencimento = $7, valor = $8, forma_pagamento = $9, dados_pagamento = $10
+          documento_ref = $6, vencimento = $7, valor = $8, forma_pagamento = $9, dados_pagamento = $10,
+          status = case when $12::text is null then status else $12 end
         where id = $11
         returning id, status
       `, [
@@ -236,6 +237,7 @@ const server = http.createServer(async (req, res) => {
         body.forma_pagamento || null,
         body.dados_pagamento ? String(body.dados_pagamento).trim() : null,
         id,
+        body.status && ['rascunho', 'classificada', 'pronta'].includes(body.status) ? body.status : null,
       ])
       if (!updated.rowCount) return send(res, 404, JSON.stringify({ erro: 'Despesa não encontrada.' }))
       return send(res, 200, JSON.stringify(updated.rows[0]))

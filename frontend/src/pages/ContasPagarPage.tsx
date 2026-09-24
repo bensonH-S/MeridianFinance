@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import Alert from '@mui/material/Alert'
 import Autocomplete from '@mui/material/Autocomplete'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
@@ -11,6 +12,7 @@ import Drawer from '@mui/material/Drawer'
 import IconButton from '@mui/material/IconButton'
 import MenuItem from '@mui/material/MenuItem'
 import Paper from '@mui/material/Paper'
+import Snackbar from '@mui/material/Snackbar'
 import Stack from '@mui/material/Stack'
 import Table from '@mui/material/Table'
 import TableBody from '@mui/material/TableBody'
@@ -24,7 +26,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import { api, brl, type Conta, type Despesa, type Empresa, type Fornecedor, type Plano } from '../api'
 
 const STATUS: Record<string, string> = {
-  rascunho: 'Rascunho', classificada: 'Classificada', pronta: 'Para autorizar', autorizada: 'Autorizada',
+  rascunho: 'A classificar', classificada: 'Classificada', pronta: 'Para autorizar', autorizada: 'Autorizada',
   enviada: 'Enviada', paga: 'Paga', conciliada: 'Conciliada', bloqueada_duplicata: 'Duplicata',
 }
 const CODIGO: Record<string, string> = {
@@ -36,6 +38,21 @@ const FILTROS = ['Todas', 'Para autorizar', 'Vencidas'] as const
 const aberta = (e: Despesa) => !['paga', 'conciliada', 'cancelada'].includes(e.status)
 const hoje = new Date().toISOString().slice(0, 10)
 
+function dataLocal(d: Date) {
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const dia = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${m}-${dia}`
+}
+
+function periodoAtual() {
+  const inicio = new Date()
+  inicio.setHours(0, 0, 0, 0)
+  inicio.setDate(inicio.getDate() - ((inicio.getDay() + 1) % 7))
+  const fim = new Date(inicio)
+  fim.setDate(fim.getDate() + 7)
+  return { de: dataLocal(inicio), ate: dataLocal(fim) }
+}
+
 export function ContasPagarPage() {
   const [empresas, setEmpresas] = useState<Empresa[]>([])
   const [contas, setContas] = useState<Conta[]>([])
@@ -43,11 +60,14 @@ export function ContasPagarPage() {
   const [despesas, setDespesas] = useState<Despesa[]>([])
   const [loja, setLoja] = useState('')
   const [busca, setBusca] = useState('')
+  const [de, setDe] = useState(() => periodoAtual().de)
+  const [ate, setAte] = useState(() => periodoAtual().ate)
   const [filtro, setFiltro] = useState<(typeof FILTROS)[number]>('Todas')
   const [aberto, setAberto] = useState(false)
   const [editando, setEditando] = useState<Despesa | null>(null)
   const [excluir, setExcluir] = useState<Despesa | null>(null)
   const [excluindo, setExcluindo] = useState(false)
+  const [aviso, setAviso] = useState('')
   const [erroExcluir, setErroExcluir] = useState('')
 
   const carregar = (empresa = loja) => api.despesas(empresa || undefined).then(setDespesas).catch(() => setDespesas([]))
@@ -59,21 +79,35 @@ export function ContasPagarPage() {
     carregar('')
   }, [])
 
-  const linhas = useMemo(() => despesas.filter((e) => {
+  const noPeriodo = useMemo(() => despesas.filter((e) => {
+    if (!e.vencimento) return !de && !ate
+    if (de && e.vencimento < de) return false
+    if (ate && e.vencimento > ate) return false
+    return true
+  }), [despesas, de, ate])
+
+  const linhas = useMemo(() => noPeriodo.filter((e) => {
     const texto = `${e.descricao} ${e.fornecedor ?? ''} ${e.origem} ${e.plano ?? ''}`.toLowerCase()
     if (busca && !texto.includes(busca.toLowerCase())) return false
     if (filtro === 'Para autorizar') return e.status === 'pronta'
     if (filtro === 'Vencidas') return aberta(e) && !!e.vencimento && e.vencimento < hoje
     return true
-  }), [despesas, busca, filtro])
+  }), [noPeriodo, busca, filtro])
 
-  const soma = (pred: (e: Despesa) => boolean) => despesas.filter(pred).reduce((a, e) => a + Number(e.valor), 0)
+  const soma = (pred: (e: Despesa) => boolean) => noPeriodo.filter(pred).reduce((a, e) => a + Number(e.valor), 0)
   const lojas = empresas.filter((e) => e.tipo === 'loja')
 
+  const nota = (e: Despesa) => {
+    const doc = e.documento_ref && !e.documento_ref.startsWith('BANCO-') ? `NF ${e.documento_ref}` : ''
+    return [e.fornecedor, e.plano, doc].filter(Boolean).join(' · ')
+  }
+
   return (
-    <Stack spacing={2}>
+    <Stack spacing={2} sx={{ height: '100%', minHeight: 0 }}>
       <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} sx={{ alignItems: { md: 'center' } }}>
         <TextField size="small" placeholder="Buscar lançamento" value={busca} onChange={(ev) => setBusca(ev.target.value)} sx={{ minWidth: 280, bgcolor: 'background.paper' }} />
+        <TextField size="small" label="De" type="date" value={de} onChange={(ev) => setDe(ev.target.value)} slotProps={{ inputLabel: { shrink: true } }} sx={{ width: 150, bgcolor: 'background.paper' }} />
+        <TextField size="small" label="Até" type="date" value={ate} onChange={(ev) => setAte(ev.target.value)} slotProps={{ inputLabel: { shrink: true } }} sx={{ width: 150, bgcolor: 'background.paper' }} />
         <TextField select size="small" label="Loja" value={loja} onChange={(ev) => { setLoja(ev.target.value); carregar(ev.target.value) }} sx={{ minWidth: 180, bgcolor: 'background.paper' }}>
           <MenuItem value="">Todas as lojas</MenuItem>
           {lojas.map((e) => <MenuItem key={e.id} value={e.id}>{e.apelido}</MenuItem>)}
@@ -83,7 +117,7 @@ export function ContasPagarPage() {
       </Stack>
 
       <Stack direction="row" spacing={1.5} sx={{ flexWrap: 'wrap' }}>
-        <Resumo rotulo="A pagar" valor={brl(soma(aberta))} detalhe={`${despesas.filter(aberta).length} em aberto`} />
+        <Resumo rotulo="A pagar" valor={brl(soma(aberta))} detalhe={`${noPeriodo.filter(aberta).length} em aberto`} />
         <Resumo rotulo="Pago" valor={brl(soma((e) => e.status === 'paga' || e.status === 'conciliada'))} detalhe="já baixadas" />
         <Resumo rotulo="Para autorizar" valor={brl(soma((e) => e.status === 'pronta'))} detalhe="aguardando o Felipe" />
         <Resumo rotulo="Vencida" valor={brl(soma((e) => aberta(e) && !!e.vencimento && e.vencimento < hoje))} detalhe="sem pagar" />
@@ -105,8 +139,8 @@ export function ContasPagarPage() {
         ))}
       </Stack>
 
-      <Paper variant="outlined" sx={{ overflow: 'auto' }}>
-        <Table size="small">
+      <Paper variant="outlined" sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+        <Table size="small" stickyHeader>
           <TableHead>
             <TableRow>
               {['Status', 'Descrição', 'Origem', 'Forma de pagamento', 'Código', 'Vencimento', 'Valor', ''].map((h) => (
@@ -125,7 +159,7 @@ export function ContasPagarPage() {
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2" sx={{ fontWeight: 400 }}>{e.descricao}</Typography>
-                  <Typography variant="caption" color="text.secondary">{e.fornecedor || 'Sem fornecedor'}{e.documento_ref ? ` · ${e.documento_ref}` : ''}</Typography>
+                  <Typography variant="caption" color="text.secondary">{nota(e) || 'Sem fornecedor'}</Typography>
                 </TableCell>
                 <TableCell>{e.origem}</TableCell>
                 <TableCell>{CODIGO[e.forma_pagamento || ''] || '—'}</TableCell>
@@ -163,6 +197,7 @@ export function ContasPagarPage() {
                 await api.excluirDespesa(excluir.id)
                 setExcluir(null)
                 carregar()
+                setAviso('Despesa excluída.')
               } catch (err) {
                 setErroExcluir(err instanceof Error ? err.message : 'Não excluiu')
               } finally {
@@ -182,8 +217,11 @@ export function ContasPagarPage() {
         contas={contas}
         plano={plano}
         onFechar={() => { setAberto(false); setEditando(null) }}
-        onSalvou={() => { setAberto(false); setEditando(null); carregar() }}
+        onSalvou={(mensagem) => { setAberto(false); setEditando(null); carregar(); setAviso(mensagem) }}
       />
+      <Snackbar open={!!aviso} autoHideDuration={3200} onClose={() => setAviso('')} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Alert severity="success" variant="filled" onClose={() => setAviso('')} sx={{ bgcolor: '#1F8A4C' }}>{aviso}</Alert>
+      </Snackbar>
     </Stack>
   )
 }
@@ -241,7 +279,7 @@ function DespesaForm({ aberto, inicial, empresas, contas, plano, onFechar, onSal
   contas: Conta[]
   plano: Plano[]
   onFechar: () => void
-  onSalvou: () => void
+  onSalvou: (mensagem: string) => void
 }) {
   const lojas = empresas.filter((e) => e.tipo === 'loja')
   const [descricao, setDescricao] = useState('')
@@ -312,7 +350,7 @@ function DespesaForm({ aberto, inicial, empresas, contas, plano, onFechar, onSal
       }
       if (inicial) await api.atualizarDespesa(inicial.id, corpo)
       else await api.criarDespesa(corpo)
-      onSalvou()
+      onSalvou(inicial ? 'Despesa atualizada.' : 'Despesa cadastrada.')
     } catch (err) {
       setErro(err instanceof Error ? err.message : 'Não salvou')
     }
