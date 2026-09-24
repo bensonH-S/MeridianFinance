@@ -3,6 +3,7 @@ import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Checkbox from '@mui/material/Checkbox'
+import Chip from '@mui/material/Chip'
 import Paper from '@mui/material/Paper'
 import Snackbar from '@mui/material/Snackbar'
 import Stack from '@mui/material/Stack'
@@ -129,8 +130,10 @@ export function DdaPage() {
                 </TableCell>
                 <TableCell>{dataBr(linha.vencimento)}</TableCell>
                 <TableCell align="right">{linha.valor == null ? '—' : brl(linha.valor)}</TableCell>
-                <TableCell sx={{ color: linha.pronto ? 'text.primary' : 'warning.main' }}>
-                  {linha.pronto ? (linha.fornecedor_id ? 'Fornecedor vinculado' : 'Sem fornecedor') : linha.motivo}
+                <TableCell>
+                  {linha.pronto && !linha.fornecedor_id
+                    ? <Chip size="small" label="Sem fornecedor" variant="outlined" sx={{ color: '#E8A87C', borderColor: '#6B4A32', fontWeight: 500 }} />
+                    : <Typography variant="body2" color={linha.pronto ? 'text.primary' : 'warning.main'}>{linha.pronto ? 'Fornecedor vinculado' : linha.motivo}</Typography>}
                 </TableCell>
               </TableRow>
             ))}

@@ -169,7 +169,9 @@ export function ContasPagarPage() {
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2" sx={{ fontWeight: 400 }}>{e.descricao}</Typography>
-                  <Typography variant="caption" color="text.secondary">{nota(e) || 'Sem fornecedor'}</Typography>
+                  {e.fornecedor
+                    ? <Typography variant="caption" color="text.secondary">{nota(e)}</Typography>
+                    : <Chip size="small" label="Sem fornecedor" variant="outlined" sx={{ mt: 0.5, height: 22, color: '#E8A87C', borderColor: '#6B4A32', fontWeight: 500 }} />}
                 </TableCell>
                 <TableCell>{e.origem}</TableCell>
                 <TableCell>
