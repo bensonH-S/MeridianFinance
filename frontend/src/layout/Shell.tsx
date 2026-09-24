@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { api } from '../api'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined'
@@ -54,6 +56,13 @@ const titulos: Record<string, { title: string; subtitle: string }> = {
 export function Shell() {
   const { pathname } = useLocation()
   const pagina = titulos[pathname] ?? { title: 'Meridian Finance', subtitle: '' }
+  const [sessao, setSessao] = useState({ versao: '…', nome: 'Felipe', papel: 'Autoriza' })
+
+  useEffect(() => {
+    api.sistema()
+      .then((data) => setSessao({ versao: data.versao, nome: data.usuario.nome, papel: data.usuario.papel }))
+      .catch(() => setSessao((atual) => ({ ...atual, versao: 'dev' })))
+  }, [])
 
   return (
     <Box sx={{ display: 'flex', height: '100%', bgcolor: 'background.default', overflow: 'hidden' }}>
@@ -168,9 +177,30 @@ export function Shell() {
               </Typography>
             )}
           </Box>
-          <Typography sx={{ fontSize: 14, fontWeight: 500, color: 'text.secondary', flexShrink: 0 }}>
-            Meridian Finance
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, flexShrink: 0 }}>
+            <Box
+              aria-hidden
+              sx={{
+                width: 32,
+                height: 32,
+                borderRadius: '50%',
+                bgcolor: 'rgba(255,90,10,0.16)',
+                color: '#FF5A0A',
+                display: 'grid',
+                placeItems: 'center',
+                fontSize: 13,
+                fontWeight: 600,
+              }}
+            >
+              {sessao.nome.slice(0, 1)}
+            </Box>
+            <Box sx={{ textAlign: 'right' }}>
+              <Typography sx={{ fontSize: 13, fontWeight: 600, lineHeight: 1.2 }}>{sessao.nome}</Typography>
+              <Typography sx={{ fontSize: 12, color: '#8FA0AF', lineHeight: 1.2 }}>
+                {sessao.papel} · {sessao.versao}
+              </Typography>
+            </Box>
+          </Box>
         </Box>
         <Box component="main" sx={{ flex: 1, minHeight: 0, overflow: 'auto', px: 3, py: 2.5 }}>
           <Outlet />

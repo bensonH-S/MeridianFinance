@@ -31,7 +31,10 @@ async function get<T>(url: string): Promise<T> {
   return res.json()
 }
 
+export type Sessao = { versao: string; usuario: { nome: string; papel: string } }
+
 export const api = {
+  sistema: () => get<Sessao>(`${apiRoot}/sistema`),
   empresas: () => get<Empresa[]>(`${apiRoot}/empresas`),
   contas: () => get<Conta[]>(`${apiRoot}/contas`),
   plano: () => get<Plano[]>(`${apiRoot}/plano`),

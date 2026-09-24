@@ -1,14 +1,15 @@
 #!/bin/bash
 set -euo pipefail
 
-cd "$(dirname "$0")"
-
 if [ -z "${DEPLOY_REEXEC:-}" ]; then
+  ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   bak="$(mktemp /tmp/meridian-finance-deploy.XXXXXX.sh)"
-  cp "$0" "$bak"
+  cp "${BASH_SOURCE[0]}" "$bak"
   chmod +x "$bak"
-  DEPLOY_REEXEC=1 exec "$bak"
+  DEPLOY_REEXEC=1 DEPLOY_ROOT="$ROOT" exec "$bak"
 fi
+
+cd "${DEPLOY_ROOT:?}"
 
 echo "Atualizando tags..."
 git fetch origin --tags

@@ -3,7 +3,7 @@ Description=Meridian Finance
 After=network.target
 
 [Service]
-WorkingDirectory=/var/www/meridian-finance
+WorkingDirectory=/var/www/app/meridian-finance
 Environment=NODE_ENV=production
 Environment=PORT=3018
 ExecStart=/usr/bin/node server.mjs

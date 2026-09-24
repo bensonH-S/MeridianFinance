@@ -1,6 +1,7 @@
 import http from 'node:http'
 import fs from 'node:fs'
 import path from 'node:path'
+import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import pg from 'pg'
 
@@ -37,6 +38,23 @@ const pool = new pg.Pool({
 })
 
 const FORMAS = new Set(['dinheiro', 'online', 'boleto', 'guia', 'folha', 'cadastro', 'chave_pix'])
+
+const sessao = { nome: 'Felipe', papel: 'Autoriza' }
+
+function versaoApp() {
+  if (process.env.APP_VERSION) return process.env.APP_VERSION
+  try {
+    return execFileSync('git', ['describe', '--tags', '--abbrev=0'], {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+  } catch {
+    return 'dev'
+  }
+}
+
+const versao = versaoApp()
 
 function send(res, status, body, type = 'application/json; charset=utf-8') {
   res.writeHead(status, { 'content-type': type, 'cache-control': 'no-store' })
@@ -108,6 +126,9 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === '/financas') url.pathname = '/'
   else if (url.pathname.startsWith('/financas/')) url.pathname = url.pathname.slice('/financas'.length)
   try {
+    if (req.method === 'GET' && url.pathname === '/api/sistema') {
+      return send(res, 200, JSON.stringify({ versao, usuario: sessao }))
+    }
     if (req.method === 'GET' && url.pathname === '/api/despesas') {
       return send(res, 200, JSON.stringify(await listarDespesas(url.searchParams.get('empresa') || '')))
     }
@@ -251,11 +272,9 @@ const server = http.createServer(async (req, res) => {
   }
 })
 
-pool.query('alter table despesas add column if not exists dados_pagamento text').then(() => {
-  server.listen(port, '127.0.0.1', () => {
-    console.log(`meridian-finance http://127.0.0.1:${port}`)
+server.listen(port, '127.0.0.1', () => {
+  console.log(`meridian-finance http://127.0.0.1:${port}`)
+  pool.query('alter table despesas add column if not exists dados_pagamento text').catch((err) => {
+    console.error(err.message)
   })
-}).catch((err) => {
-  console.error(err.message)
-  process.exit(1)
 })
