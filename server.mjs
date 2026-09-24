@@ -4,6 +4,7 @@ import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import pg from 'pg'
+import { classificar, lerPlanilha } from './lib/dda.mjs'
 
 const root = path.dirname(fileURLToPath(import.meta.url))
 const port = Number(process.env.PORT || 5080)
@@ -72,6 +73,19 @@ function readBody(req) {
     })
     req.on('error', reject)
   })
+}
+
+async function contextoDda() {
+  const [empresas, fornecedores, existentes] = await Promise.all([
+    pool.query(`select id, apelido, razao_social, cnpj from empresas where ativo`),
+    pool.query(`select id, nome, cpf_cnpj, plano_conta_id from fornecedores where ativo`),
+    pool.query(`select empresa_origem_id, documento_ref from despesas where documento_ref is not null and status <> 'cancelada'`),
+  ])
+  return {
+    empresas: empresas.rows,
+    fornecedores: fornecedores.rows,
+    existentes: existentes.rows.map((linha) => `${linha.empresa_origem_id}|${linha.documento_ref}`),
+  }
 }
 
 async function listarDespesas(empresaId) {
@@ -250,6 +264,45 @@ const server = http.createServer(async (req, res) => {
       const deleted = await pool.query('delete from despesas where id = $1 returning id', [id])
       if (!deleted.rowCount) return send(res, 404, JSON.stringify({ erro: 'Despesa não encontrada.' }))
       return send(res, 200, JSON.stringify(deleted.rows[0]))
+    }
+    if (req.method === 'POST' && (url.pathname === '/api/dda/previa' || url.pathname === '/api/dda/importar')) {
+      const body = await readBody(req)
+      const contexto = await contextoDda()
+      if (url.pathname === '/api/dda/previa') {
+        if (!body.arquivo) return send(res, 400, JSON.stringify({ erro: 'Envie a planilha de DDA.' }))
+        let linhas
+        try {
+          linhas = classificar(lerPlanilha(Buffer.from(body.arquivo, 'base64')), contexto)
+        } catch (err) {
+          return send(res, 400, JSON.stringify({ erro: err.message || 'Planilha inválida.' }))
+        }
+        return send(res, 200, JSON.stringify({ linhas }))
+      }
+      const selecionadas = Array.isArray(body.linhas) ? body.linhas : []
+      const prontas = classificar(selecionadas, contexto).filter((linha) => linha.pronto)
+      let criadas = 0
+      for (const linha of prontas) {
+        const status = linha.fornecedor_id ? 'classificada' : 'rascunho'
+        await pool.query(`
+          insert into despesas (
+            descricao, fornecedor_id, empresa_origem_id, plano_conta_id,
+            documento_ref, competencia, vencimento, valor, forma_pagamento, dados_pagamento, status
+          ) values ($1,$2,$3,$4,$5,$6,$7,$8,'boleto',$9,$10)
+        `, [
+          (linha.cedente || 'Boleto DDA').slice(0, 180),
+          linha.fornecedor_id,
+          linha.empresa_id,
+          linha.plano_conta_id,
+          linha.documento_ref,
+          linha.competencia,
+          linha.vencimento,
+          linha.valor,
+          linha.codigo ? String(linha.codigo).trim() : null,
+          status,
+        ])
+        criadas += 1
+      }
+      return send(res, 201, JSON.stringify({ criadas, ignoradas: selecionadas.length - criadas }))
     }
     if (req.method === 'GET' && !url.pathname.startsWith('/api')) {
       const dist = path.join(root, 'frontend', 'dist')

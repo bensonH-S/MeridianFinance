@@ -43,7 +43,7 @@ const titulos: Record<string, { title: string; subtitle: string }> = {
   '/caixa': { title: 'Fechamento de caixa', subtitle: 'Módulo em desenvolvimento.' },
   '/movimento': { title: 'Contas movimento', subtitle: 'Módulo em desenvolvimento.' },
   '/dre': { title: 'DRE', subtitle: 'Módulo em desenvolvimento.' },
-  '/integracoes': { title: 'Integrações', subtitle: 'Módulo em desenvolvimento.' },
+  '/integracoes': { title: 'Integrações', subtitle: 'Boletos do DDA no nome das empresas.' },
   '/configuracoes': { title: 'Configuração', subtitle: 'Módulo em desenvolvimento.' },
   '/configuracoes/empresas': { title: 'Empresas', subtitle: 'Lojas e holdings.' },
   '/configuracoes/contas': { title: 'Contas bancárias', subtitle: 'Caixa, Banco do Brasil e Itaú.' },

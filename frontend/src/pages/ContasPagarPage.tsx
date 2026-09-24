@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Alert from '@mui/material/Alert'
 import Autocomplete from '@mui/material/Autocomplete'
 import Box from '@mui/material/Box'
@@ -54,6 +55,7 @@ function periodoAtual() {
 }
 
 export function ContasPagarPage() {
+  const navigate = useNavigate()
   const [empresas, setEmpresas] = useState<Empresa[]>([])
   const [contas, setContas] = useState<Conta[]>([])
   const [plano, setPlano] = useState<Plano[]>([])
@@ -99,7 +101,8 @@ export function ContasPagarPage() {
   const lojas = empresas.filter((e) => e.tipo === 'loja')
 
   const nota = (e: Despesa) => {
-    const doc = e.documento_ref && !e.documento_ref.startsWith('BANCO-') ? `NF ${e.documento_ref}` : ''
+    const doc = e.documento_ref && !e.documento_ref.startsWith('BANCO-') && !e.documento_ref.startsWith('DDA|') && e.documento_ref.length <= 20
+      ? `NF ${e.documento_ref}` : ''
     return [e.fornecedor, e.plano, doc].filter(Boolean).join(' · ')
   }
 
@@ -114,6 +117,7 @@ export function ContasPagarPage() {
           {lojas.map((e) => <MenuItem key={e.id} value={e.id}>{e.apelido}</MenuItem>)}
         </TextField>
         <Box sx={{ flex: 1 }} />
+        <Button variant="outlined" onClick={() => navigate('/integracoes')}>Importar DDA</Button>
         <Button variant="contained" color="secondary" startIcon={<AddIcon />} onClick={() => setAberto(true)}>Nova despesa</Button>
       </Stack>
 

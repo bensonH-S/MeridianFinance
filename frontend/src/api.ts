@@ -32,6 +32,27 @@ async function get<T>(url: string): Promise<T> {
   return res.json()
 }
 
+export type LinhaDda = {
+  cedente: string
+  cnpj_cedente: string
+  sacado: string
+  cnpj_sacado: string
+  vencimento: string
+  valor: number | null
+  codigo: string
+  situacao: string
+  documento: string
+  documento_ref: string
+  competencia: string
+  empresa_id: string | null
+  empresa: string
+  fornecedor_id: string | null
+  fornecedor: string
+  plano_conta_id: string | null
+  pronto: boolean
+  motivo: string
+}
+
 export type Sessao = { versao: string; usuario: { nome: string; papel: string } }
 
 export const api = {
@@ -56,6 +77,26 @@ export const api = {
     const data = await res.json()
     if (!res.ok) throw new Error(data.erro || 'Não excluiu')
     return data as { id: string }
+  },
+  previaDda: async (arquivo: string) => {
+    const res = await fetch(`${apiRoot}/dda/previa`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ arquivo }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.erro || 'Não leu a planilha')
+    return data as { linhas: LinhaDda[] }
+  },
+  importarDda: async (linhas: LinhaDda[]) => {
+    const res = await fetch(`${apiRoot}/dda/importar`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ linhas }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.erro || 'Não importou')
+    return data as { criadas: number; ignoradas: number }
   },
   atualizarDespesa: async (id: string, body: Record<string, unknown>) => {
     const res = await fetch(`${apiRoot}/despesas/${id}`, {
