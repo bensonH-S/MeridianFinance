@@ -19,13 +19,14 @@ import Table from '@mui/material/Table'
 import TableBody from '@mui/material/TableBody'
 import TableCell from '@mui/material/TableCell'
 import TableHead from '@mui/material/TableHead'
+import TablePagination from '@mui/material/TablePagination'
 import TableRow from '@mui/material/TableRow'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import AddIcon from '@mui/icons-material/Add'
 import CheckIcon from '@mui/icons-material/Check'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
-import { api, brl, type Conta, type Despesa, type Empresa, type Fornecedor, type Plano } from '../api'
+import { api, brl, type Despesa, type Empresa, type Fornecedor } from '../api'
 
 const STATUS: Record<string, string> = {
   rascunho: 'A classificar', classificada: 'Classificada', pronta: 'Para autorizar', autorizada: 'Autorizada',
@@ -35,7 +36,7 @@ const CODIGO: Record<string, string> = {
   folha: 'Folha', cadastro: 'Cadastro', chave_pix: 'Chave PIX',
   boleto: 'Boleto', guia: 'Guia', dinheiro: 'Dinheiro', online: 'Online',
 }
-const FILTROS = ['Todas', 'Para autorizar', 'Vencidas'] as const
+const FILTROS = ['Todas', 'Para autorizar', 'Vencidas', 'NF confirmada'] as const
 
 const aberta = (e: Despesa) => !['paga', 'conciliada', 'cancelada'].includes(e.status)
 const hoje = new Date().toISOString().slice(0, 10)
@@ -58,14 +59,14 @@ function periodoAtual() {
 export function ContasPagarPage() {
   const navigate = useNavigate()
   const [empresas, setEmpresas] = useState<Empresa[]>([])
-  const [contas, setContas] = useState<Conta[]>([])
-  const [plano, setPlano] = useState<Plano[]>([])
   const [despesas, setDespesas] = useState<Despesa[]>([])
   const [loja, setLoja] = useState('')
   const [busca, setBusca] = useState('')
   const [de, setDe] = useState(() => periodoAtual().de)
   const [ate, setAte] = useState(() => periodoAtual().ate)
   const [filtro, setFiltro] = useState<(typeof FILTROS)[number]>('Todas')
+  const [pagina, setPagina] = useState(0)
+  const [porPagina, setPorPagina] = useState(20)
   const [aberto, setAberto] = useState(false)
   const [editando, setEditando] = useState<Despesa | null>(null)
   const [excluir, setExcluir] = useState<Despesa | null>(null)
@@ -76,9 +77,7 @@ export function ContasPagarPage() {
   const carregar = (empresa = loja) => api.despesas(empresa || undefined).then(setDespesas).catch(() => setDespesas([]))
 
   useEffect(() => {
-    Promise.all([api.empresas(), api.contas(), api.plano()]).then(([e, c, p]) => {
-      setEmpresas(e); setContas(c); setPlano(p)
-    }).catch(() => undefined)
+    api.empresas().then(setEmpresas).catch(() => undefined)
     carregar('')
   }, [])
 
@@ -95,8 +94,13 @@ export function ContasPagarPage() {
     if (busca && !texto.includes(busca.toLowerCase())) return false
     if (filtro === 'Para autorizar') return e.status === 'pronta'
     if (filtro === 'Vencidas') return aberta(e) && !!e.vencimento && e.vencimento < hoje
+    if (filtro === 'NF confirmada') return e.nf_confirmada
     return true
   }), [noPeriodo, busca, filtro])
+
+  useEffect(() => { setPagina(0) }, [busca, de, ate, loja, filtro])
+
+  const visiveis = linhas.slice(pagina * porPagina, pagina * porPagina + porPagina)
 
   const soma = (pred: (e: Despesa) => boolean) => noPeriodo.filter(pred).reduce((a, e) => a + Number(e.valor), 0)
   const lojas = empresas.filter((e) => e.tipo === 'loja')
@@ -135,7 +139,7 @@ export function ContasPagarPage() {
             key={item}
             label={CODIGO[item] || item}
             variant="outlined"
-            onClick={() => setFiltro(item)}
+            onClick={() => { setFiltro(item); setPagina(0) }}
             sx={{
               bgcolor: filtro === item ? 'rgba(255, 90, 10, 0.12)' : '#0D161F',
               borderColor: filtro === item ? '#FF5A0A' : '#1C2A35',
@@ -158,7 +162,7 @@ export function ContasPagarPage() {
             {linhas.length === 0 && (
               <TableRow><TableCell colSpan={9} sx={{ color: 'text.secondary', py: 4 }}>Nenhuma despesa nesse filtro.</TableCell></TableRow>
             )}
-            {linhas.map((e) => (
+            {visiveis.map((e) => (
               <TableRow key={e.id} hover>
                 <TableCell>
                   <Chip size="small" label={STATUS[e.status] || e.status} variant="outlined" sx={{ color: 'text.secondary', borderColor: 'divider' }} />
@@ -188,6 +192,18 @@ export function ContasPagarPage() {
           </TableBody>
         </Table>
       </Paper>
+      <TablePagination
+        component="div"
+        count={linhas.length}
+        page={pagina}
+        onPageChange={(_, nova) => setPagina(nova)}
+        rowsPerPage={porPagina}
+        onRowsPerPageChange={(ev) => { setPorPagina(Number(ev.target.value)); setPagina(0) }}
+        rowsPerPageOptions={[20, 50, 100]}
+        labelRowsPerPage="Por página"
+        labelDisplayedRows={({ from, to, count }) => `${from}–${to} de ${count}`}
+        sx={{ flexShrink: 0, borderTop: '1px solid #1C2A35' }}
+      />
 
       <Dialog open={!!excluir} onClose={() => { if (!excluindo) setExcluir(null) }}>
         <DialogTitle>Deseja excluir?</DialogTitle>
@@ -225,8 +241,6 @@ export function ContasPagarPage() {
         aberto={aberto || !!editando}
         inicial={editando}
         empresas={empresas}
-        contas={contas}
-        plano={plano}
         onFechar={() => { setAberto(false); setEditando(null) }}
         onSalvou={(mensagem) => { setAberto(false); setEditando(null); carregar(); setAviso(mensagem) }}
       />
@@ -283,12 +297,10 @@ function parseMoeda(texto: string) {
   return Number(limpo)
 }
 
-function DespesaForm({ aberto, inicial, empresas, contas, plano, onFechar, onSalvou }: {
+function DespesaForm({ aberto, inicial, empresas, onFechar, onSalvou }: {
   aberto: boolean
   inicial: Despesa | null
   empresas: Empresa[]
-  contas: Conta[]
-  plano: Plano[]
   onFechar: () => void
   onSalvou: (mensagem: string) => void
 }) {
@@ -298,7 +310,6 @@ function DespesaForm({ aberto, inicial, empresas, contas, plano, onFechar, onSal
   const [vencimento, setVencimento] = useState('')
   const [documento, setDocumento] = useState('')
   const [origem, setOrigem] = useState('')
-  const [dona, setDona] = useState('')
   const [conta, setConta] = useState('')
   const [planoId, setPlanoId] = useState('')
   const [forma, setForma] = useState('boleto')
@@ -308,7 +319,6 @@ function DespesaForm({ aberto, inicial, empresas, contas, plano, onFechar, onSal
   const [pagamento, setPagamento] = useState('')
   const [erro, setErro] = useState('')
 
-  const contasDa = contas.filter((c) => c.empresa_id === (dona || origem))
   const pedeCodigo = forma === 'boleto' || forma === 'chave_pix'
 
   useEffect(() => {
@@ -318,7 +328,7 @@ function DespesaForm({ aberto, inicial, empresas, contas, plano, onFechar, onSal
     if (!inicial) {
       setDescricao(''); setValor(''); setVencimento(''); setDocumento('')
       setOrigem(empresas.find((e) => e.tipo === 'loja')?.id || '')
-      setDona(''); setConta(''); setPlanoId(''); setForma('boleto')
+      setConta(''); setPlanoId(''); setForma('boleto')
       setFornecedor(null); setBuscaFor(''); setPagamento('')
       return
     }
@@ -327,7 +337,6 @@ function DespesaForm({ aberto, inicial, empresas, contas, plano, onFechar, onSal
     setVencimento(inicial.vencimento || '')
     setDocumento(inicial.documento_ref || '')
     setOrigem(inicial.origem_id)
-    setDona(inicial.conta_empresa_id && inicial.conta_empresa_id !== inicial.origem_id ? inicial.conta_empresa_id : '')
     setConta(inicial.conta_saida_id || '')
     setPlanoId(inicial.plano_conta_id || '')
     setForma(inicial.forma_pagamento || 'boleto')
@@ -338,9 +347,15 @@ function DespesaForm({ aberto, inicial, empresas, contas, plano, onFechar, onSal
 
   const buscar = async (q: string) => {
     setBuscaFor(q)
-    setFornecedor(null)
     if (q.trim().length < 2) { setHits([]); return }
     setHits(await api.fornecedores(q.trim()))
+  }
+
+  const escolherFornecedor = (item: Fornecedor | null) => {
+    setFornecedor(item)
+    setBuscaFor(item?.nome || '')
+    setPlanoId(item?.plano_conta_id || '')
+    setHits([])
   }
 
   const salvar = async () => {
@@ -355,7 +370,7 @@ function DespesaForm({ aberto, inicial, empresas, contas, plano, onFechar, onSal
         forma_pagamento: forma,
         empresa_origem_id: origem,
         conta_saida_id: conta || null,
-        plano_conta_id: planoId || null,
+        plano_conta_id: fornecedor?.plano_conta_id || planoId || null,
         fornecedor_id: fornecedor?.id || null,
         dados_pagamento: pedeCodigo ? pagamento.trim() || null : null,
       }
@@ -387,37 +402,26 @@ function DespesaForm({ aberto, inicial, empresas, contas, plano, onFechar, onSal
             options={lojas}
             getOptionLabel={(e) => e.apelido}
             value={lojas.find((e) => e.id === origem) || null}
-            onChange={(_, item) => { setOrigem(item?.id || ''); setConta('') }}
+            onChange={(_, item) => setOrigem(item?.id || '')}
             slotProps={lista}
-            renderInput={(params) => <TextField {...params} label="Onde o serviço aconteceu" />}
+            renderInput={(params) => <TextField {...params} label="Loja" />}
           />
           <Autocomplete
             size="small"
-            options={empresas}
-            getOptionLabel={(e) => e.apelido}
-            value={empresas.find((e) => e.id === dona) || null}
-            onChange={(_, item) => { setDona(item?.id || ''); setConta('') }}
+            options={hits}
+            getOptionLabel={(item) => item.nome}
+            filterOptions={(opcoes) => opcoes}
+            inputValue={buscaFor}
+            value={fornecedor}
+            onInputChange={(_, texto, motivo) => { if (motivo === 'input') buscar(texto) }}
+            onChange={(_, item) => escolherFornecedor(item)}
             slotProps={lista}
-            renderInput={(params) => <TextField {...params} label="Pagar pela conta de" placeholder="A mesma empresa" />}
+            renderInput={(params) => <TextField {...params} label="Fornecedor" placeholder="Buscar" />}
+            renderOption={(props, item) => (
+              <li {...props} key={item.id}>{item.nome}{item.plano ? ` · ${item.plano}` : ''}</li>
+            )}
           />
-          <Autocomplete
-            size="small"
-            options={contasDa}
-            getOptionLabel={(c) => c.nome}
-            value={contasDa.find((c) => c.id === conta) || null}
-            onChange={(_, item) => setConta(item?.id || '')}
-            slotProps={lista}
-            renderInput={(params) => <TextField {...params} label="Conta de saída" placeholder="Definir depois" />}
-          />
-          <Autocomplete
-            size="small"
-            options={plano}
-            getOptionLabel={(p) => p.nome}
-            value={plano.find((p) => p.id === planoId) || null}
-            onChange={(_, item) => setPlanoId(item?.id || '')}
-            slotProps={lista}
-            renderInput={(params) => <TextField {...params} label="Plano de contas" placeholder="Buscar" />}
-          />
+          {fornecedor?.plano && <Typography variant="body2" color="text.secondary">Plano de contas: {fornecedor.plano}</Typography>}
           <TextField select label="Forma de pagamento" size="small" value={forma} onChange={(ev) => setForma(ev.target.value)}>
             {Object.entries(CODIGO).map(([id, nome]) => <MenuItem key={id} value={id}>{nome}</MenuItem>)}
           </TextField>
@@ -429,16 +433,6 @@ function DespesaForm({ aberto, inicial, empresas, contas, plano, onFechar, onSal
               onChange={(ev) => setPagamento(ev.target.value)}
               placeholder="Para copiar na hora de pagar"
             />
-          )}
-          <TextField label="Fornecedor" size="small" value={fornecedor?.nome || buscaFor} onChange={(ev) => buscar(ev.target.value)} />
-          {hits.length > 0 && (
-            <Paper variant="outlined">
-              {hits.map((h) => (
-                <Button key={h.id} fullWidth sx={{ justifyContent: 'flex-start' }} onClick={() => { setFornecedor(h); setHits([]); if (h.plano_conta_id) setPlanoId(h.plano_conta_id) }}>
-                  {h.nome}
-                </Button>
-              ))}
-            </Paper>
           )}
           {erro && <Typography color="error" variant="body2">{erro}</Typography>}
         <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end', pt: 1 }}>

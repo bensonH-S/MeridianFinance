@@ -51,6 +51,7 @@ export type LinhaDda = {
   fornecedor_id: string | null
   fornecedor: string
   plano_conta_id: string | null
+  plano: string
   pronto: boolean
   motivo: string
 }

@@ -4,7 +4,7 @@ import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import pg from 'pg'
-import { classificar, lerPlanilha } from './lib/dda.mjs'
+import { acharFornecedor, classificar, lerPlanilha } from './lib/dda.mjs'
 import { cruzarNotas } from './lib/nfEntrada.mjs'
 
 const root = path.dirname(fileURLToPath(import.meta.url))
@@ -88,13 +88,33 @@ function readBody(req) {
 async function contextoDda() {
   const [empresas, fornecedores, existentes] = await Promise.all([
     pool.query(`select id, apelido, razao_social, cnpj from empresas where ativo`),
-    pool.query(`select id, nome, cpf_cnpj, plano_conta_id from fornecedores where ativo`),
+    pool.query(`
+      select f.id, f.nome, f.cpf_cnpj, f.plano_conta_id, p.nome as plano
+      from fornecedores f
+      left join plano_contas p on p.id = f.plano_conta_id
+      where f.ativo
+    `),
     pool.query(`select empresa_origem_id, documento_ref from despesas where documento_ref is not null and status <> 'cancelada'`),
   ])
   return {
     empresas: empresas.rows,
     fornecedores: fornecedores.rows,
     existentes: existentes.rows.map((linha) => `${linha.empresa_origem_id}|${linha.documento_ref}`),
+  }
+}
+
+async function vincularFornecedores() {
+  const [despesas, fornecedores] = await Promise.all([
+    pool.query(`select id, descricao, cnpj_cedente from despesas where fornecedor_id is null and status <> 'cancelada'`),
+    pool.query(`select id, nome, cpf_cnpj, plano_conta_id from fornecedores where ativo`),
+  ])
+  for (const despesa of despesas.rows) {
+    const fornecedor = acharFornecedor({ cedente: despesa.descricao, cnpj_cedente: despesa.cnpj_cedente }, fornecedores.rows)
+    if (!fornecedor) continue
+    await pool.query(
+      `update despesas set fornecedor_id = $2, plano_conta_id = coalesce(plano_conta_id, $3) where id = $1 and fornecedor_id is null`,
+      [despesa.id, fornecedor.id, fornecedor.plano_conta_id],
+    )
   }
 }
 
@@ -122,6 +142,7 @@ async function amarrarNotas() {
 }
 
 async function listarDespesas(empresaId) {
+  try { await vincularFornecedores() } catch (err) { console.error(err.message) }
   try { await amarrarNotas() } catch (err) { console.error(err.message) }
   const params = []
   let where = ''

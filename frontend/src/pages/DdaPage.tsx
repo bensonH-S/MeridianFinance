@@ -123,11 +123,14 @@ export function DdaPage() {
                   />
                 </TableCell>
                 <TableCell>{linha.empresa || linha.sacado || '—'}</TableCell>
-                <TableCell>{linha.fornecedor || linha.cedente || '—'}</TableCell>
+                <TableCell>
+                  {linha.fornecedor || linha.cedente || '—'}
+                  {linha.plano ? <Typography variant="caption" display="block" color="text.secondary">{linha.plano}</Typography> : null}
+                </TableCell>
                 <TableCell>{dataBr(linha.vencimento)}</TableCell>
                 <TableCell align="right">{linha.valor == null ? '—' : brl(linha.valor)}</TableCell>
                 <TableCell sx={{ color: linha.pronto ? 'text.primary' : 'warning.main' }}>
-                  {linha.pronto ? (linha.fornecedor_id ? 'Pronta' : 'A classificar') : linha.motivo}
+                  {linha.pronto ? (linha.fornecedor_id ? 'Fornecedor vinculado' : 'Sem fornecedor') : linha.motivo}
                 </TableCell>
               </TableRow>
             ))}
