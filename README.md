@@ -33,8 +33,8 @@ Loja se identifica por `bk_number`. Origem da despesa não é necessariamente a 
 
 Database `meridian_finance` na mesma instância Postgres do Meridian. Sem foreign key para tabelas do Meridian. Sem schema dentro de `vision_check`.
 
-Detalhe das decisões: [docs/ARQUITETURA.md](docs/ARQUITETURA.md)
+Detalhe das decisões: [docs/ARQUITETURA.md](docs/ARQUITETURA.md). Esquema do núcleo: [docs/BANCO.md](docs/BANCO.md).
 
 ## Status
 
-Projeto criado. Implementação ainda não começou.
+Contas a pagar em `http://127.0.0.1:5080` (`npm start`). Database `meridian_finance` com empresas, contas, plano e fornecedores. A despesa nasce como rascunho nessa tela.

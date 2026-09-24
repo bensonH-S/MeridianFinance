@@ -1,6 +1,6 @@
 # Arquitetura — Meridian Finance
 
-Decisões desta conversa. Não implementar ainda além do esqueleto do repositório.
+Decisões de produto. O esquema do núcleo está em `docs/BANCO.md` e `db/001_nucleo.sql`.
 
 Produto: **MERIDIAN FINANCE**
 Slogan: **Financeiro, pagamentos, aprovações e conciliação**

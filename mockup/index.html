@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Meridian Finance • Contas a pagar</title>
+<style>
+:root{--bg:#060b10;--panel:#0d151d;--line:#1c2a35;--text:#f5f7fa;--muted:#8fa0af;--orange:#ff5a0a;--green:#3bd18b;--yellow:#f5b942;--red:#ff5d68;--blue:#5da8ff}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(circle at 72% 0,#101d28 0,#060b10 38%);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Arial;font-size:14px}
+.app{display:grid;grid-template-columns:248px 1fr;min-height:100vh}
+.side{background:rgba(6,11,16,.92);border-right:1px solid var(--line);padding:16px 14px;position:sticky;top:0;height:100vh;overflow:auto}
+.brand{display:flex;justify-content:center;align-items:center;padding:12px 20px 10px;border-bottom:1px solid var(--line)}
+.brand img{width:112px;max-width:100%;height:auto;object-fit:contain;display:block}
+.cfg{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.cfg button{text-align:left;background:linear-gradient(180deg,rgba(17,28,38,.96),rgba(12,20,28,.96));border:1px solid var(--line);border-radius:16px;padding:20px;color:#fff;cursor:pointer;min-height:128px}
+.cfg button:hover{border-color:#5c3a27}
+.cfg button b{display:block;font-size:16px;margin-bottom:8px}
+.cfg button span{color:var(--muted);font-size:12px;line-height:1.45}
+.dev{min-height:calc(100vh - 140px);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:8px}
+.dev img{width:min(240px,56%);height:auto}
+.devtag{margin-top:8px;letter-spacing:.22em;text-transform:uppercase;color:#ff8b4d;font-size:12px;font-weight:700}
+.dev h1{margin:4px 0 0;font-size:28px}
+.navtitle{color:#667887;font-size:10px;letter-spacing:.16em;text-transform:uppercase;margin:22px 10px 8px}
+.nav button{width:100%;border:0;background:transparent;color:#b9c5ce;padding:11px 12px;border-radius:10px;display:flex;gap:10px;align-items:center;cursor:pointer;text-align:left;margin:2px 0}
+.nav button.active{background:linear-gradient(90deg,rgba(255,90,10,.20),rgba(255,90,10,.06));color:#fff;box-shadow:inset 3px 0 var(--orange)}
+.ico{width:18px;text-align:center}
+.badge{margin-left:auto;background:var(--orange);color:#fff;padding:2px 7px;border-radius:99px;font-size:11px}
+.sidefoot{margin-top:28px;padding:14px 10px;color:#687986;font-size:11px;border-top:1px solid var(--line)}
+main{min-width:0}
+.top{height:72px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;padding:0 24px;background:rgba(6,11,16,.55);backdrop-filter:blur(14px);position:sticky;top:0;z-index:20}
+.search{flex:1;max-width:560px;background:#0e1720;border:1px solid var(--line);border-radius:10px;padding:11px 14px;color:#dbe3e9}
+.select,.btn{border:1px solid var(--line);background:#0e1720;color:#dbe3e9;border-radius:10px;padding:10px 12px}
+.btn{cursor:pointer}
+.btn.primary{background:var(--orange);border-color:var(--orange);color:#fff;font-weight:700}
+.content{padding:24px;max-width:1680px;margin:auto}
+.headline{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:18px}
+.eyebrow{font-size:10px;color:#778a99;letter-spacing:.16em;text-transform:uppercase}
+.headline h1{font-size:28px;margin:4px 0 0}
+.sub{color:var(--muted);font-size:12px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.card{background:linear-gradient(180deg,rgba(17,28,38,.96),rgba(12,20,28,.96));border:1px solid var(--line);border-radius:14px;padding:16px}
+.metric{display:flex;gap:13px;align-items:center}
+.doticon{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;font-weight:800;background:#16232e}
+.doticon.o{color:var(--orange);background:rgba(255,90,10,.13)}
+.doticon.g{color:var(--green);background:rgba(59,209,139,.13)}
+.doticon.y{color:var(--yellow);background:rgba(245,185,66,.13)}
+.doticon.r{color:var(--red);background:rgba(255,93,104,.13)}
+.metric .label{color:#a8b5bf;font-size:12px}
+.metric .value{font-size:22px;font-weight:750;margin-top:3px}
+.metric .foot{color:#70818f;font-size:11px;margin-top:2px}
+.section{margin-top:16px}
+.chips{display:flex;gap:7px;overflow:auto;padding-bottom:4px}
+.chip{white-space:nowrap;border:1px solid var(--line);background:#0d161f;color:#c2cdd5;border-radius:9px;padding:8px 11px;cursor:pointer}
+.chip.active{border-color:var(--orange);color:#fff;background:rgba(255,90,10,.12)}
+table{width:100%;border-collapse:collapse}
+.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:14px;background:#0c141c}
+th{color:#738694;text-transform:uppercase;font-size:10px;letter-spacing:.04em;font-weight:600;text-align:left;padding:11px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:11px 12px;border-bottom:1px solid #17242e;color:#d7e0e6;white-space:nowrap}
+tr:last-child td{border-bottom:0}
+.tdsub{font-size:11px;color:#718492;margin-top:2px}
+.status{display:inline-flex;align-items:center;gap:6px;font-size:11px}
+.status:before{content:"";width:7px;height:7px;border-radius:50%;background:#7c8c98}
+.status.paga:before,.status.conciliada:before{background:var(--green)}
+.status.pronta:before,.status.classificada:before{background:var(--yellow)}
+.status.autorizada:before,.status.enviada:before{background:var(--blue)}
+.status.bloqueada_duplicata:before,.status.vencida:before{background:var(--red)}
+.pill{display:inline-block;padding:4px 8px;border-radius:7px;background:#172633;color:#bcd0df;font-size:11px}
+.pill.labor{background:rgba(255,90,10,.18);color:#ffb181}
+.money{font-weight:700}
+.right{text-align:right}
+.hidden{display:none!important}
+.drawer{position:fixed;right:0;top:0;width:430px;height:100vh;background:#0a1219;border-left:1px solid var(--line);z-index:50;box-shadow:-30px 0 80px #0008;padding:20px;overflow:auto}
+.drawer h2{margin:4px 0 18px}
+.field{margin:12px 0}
+.field label{display:block;color:#91a1ad;font-size:11px;margin-bottom:6px}
+.field input,.field select{width:100%;padding:11px;border-radius:9px;border:1px solid var(--line);background:#0f1a23;color:#fff}
+.close{float:right;background:transparent;color:#fff;border:0;font-size:22px;cursor:pointer}
+.toast{position:fixed;right:24px;bottom:24px;background:#13231c;border:1px solid #285a42;color:#b8f4d3;padding:12px 16px;border-radius:10px;z-index:99}
+.ai{border:1px solid rgba(255,90,10,.28);background:linear-gradient(135deg,rgba(255,90,10,.10),rgba(17,28,38,.8));margin-top:16px}
+@media(max-width:1100px){.grid4,.cfg{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:720px){.app{display:block}.side{position:relative;width:100%;height:auto}.top{position:relative;padding:10px;height:auto;flex-wrap:wrap}.search{min-width:100%}.content{padding:14px}.grid4,.grid2,.cfg{grid-template-columns:1fr}.drawer{width:100%}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="side">
+  <div class="brand"><img src="logo-meridian.png" alt="Grupo Alvim · Meridian Finance"></div>
+  <nav class="nav">
+    <div class="navtitle">Operação</div>
+    <button class="active" type="button" data-view="pay"><span class="txt">Contas a pagar</span><span class="badge" id="count">0</span></button>
+    <button type="button" data-view="receber"><span class="txt">Contas a receber</span></button>
+    <button type="button" data-view="caixa"><span class="txt">Fechamento de caixa</span></button>
+    <button type="button" data-view="movimento"><span class="txt">Contas movimento</span></button>
+    <div class="navtitle">Gestão</div>
+    <button type="button" data-view="dre"><span class="txt">DRE</span></button>
+    <button type="button" data-view="integracoes"><span class="txt">Integrações</span></button>
+    <div class="navtitle">Sistema</div>
+    <button type="button" data-view="config"><span class="txt">Configuração</span></button>
+  </nav>
+</aside>
+<main>
+  <header class="top">
+    <input class="search" id="q" placeholder="Buscar loja, fornecedor, NF, boleto ou lançamento…">
+    <select class="select" id="store"><option value="">Todas as lojas</option></select>
+  </header>
+  <div class="content" id="content"></div>
+</main>
+</div>
+<div id="drawer" class="drawer hidden"></div>
+<div id="toast" class="toast hidden"></div>
+<script>
+const BRL = n => 'R$ ' + Number(n).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+const LABELS = { rascunho:'Rascunho', classificada:'Classificada', pronta:'Pronta', autorizada:'Autorizada', enviada:'Enviada', paga:'Paga', conciliada:'Conciliada', bloqueada_duplicata:'Duplicata', aguardando_transferencia:'Transferência', cancelada:'Cancelada', faltou:'Faltou' };
+const FORMAS = { dinheiro:'Dinheiro', online:'Online', boleto:'Boleto', guia:'Guia', folha:'Folha', cadastro:'Cadastro', chave_pix:'Chave PIX' };
+const CODIGOS = { folha:'FOLHA', cadastro:'CADASTRO', chave_pix:'PIX' };
+let view = 'pay';
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let expenses = [], empresas = [], contas = [], plano = [], chip = 'Todas', fornecedorId = null;
+const sum = rows => rows.reduce((a,e) => a + Number(e.valor), 0);
+const open = e => !['paga','conciliada','cancelada'].includes(e.status);
+const hoje = new Date().toISOString().slice(0,10);
+const overdue = e => open(e) && e.vencimento && e.vencimento < hoje;
+function contaLabel(e){ return e.conta_nome || 'Sem conta' }
+function visible(){
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  const store = document.getElementById('store').value;
+  return expenses.filter(e => {
+    if (store && e.origem_id !== store) return false;
+    if (q && !(e.descricao + e.fornecedor + e.origem + e.plano + e.documento_ref).toLowerCase().includes(q)) return false;
+    if (chip === 'Pronta') return e.status === 'pronta';
+    if (chip === 'Vencidas') return overdue(e);
+    if (FORMAS[chip]) return e.forma_pagamento === chip;
+    return true;
+  });
+}
+function ehLabor(nome){
+  const n = String(nome || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+  return n.includes('TREINAMENTO') || n.includes('TEMPORARIA') || n.includes('FREE');
+}
+function opcoesCodigo(nome){
+  const sel = document.getElementById('nForma');
+  if (!sel) return;
+  const labor = ehLabor(nome);
+  const opts = labor
+    ? [['chave_pix','Chave PIX'],['folha','Folha'],['cadastro','Cadastro']]
+    : [['boleto','Boleto'],['guia','Guia'],['online','Online'],['dinheiro','Dinheiro']];
+  const atual = sel.value;
+  sel.innerHTML = opts.map(([v,l]) => `<option value="${v}">${l}</option>`).join('');
+  if (opts.some(([v]) => v === atual)) sel.value = atual;
+}
+const MODULOS = {
+  receber: ['Contas a receber', 'Entradas da operação, separadas do que está para pagar.'],
+  caixa: ['Fechamento de caixa', 'Conferência do caixa do dia, loja por loja.'],
+  movimento: ['Contas movimento', 'Transferências entre contas do grupo.'],
+  dre: ['DRE', 'Resultado do período a partir do que foi classificado.'],
+  integracoes: ['Integrações', 'Meridian, FreeControl e extrato. Cada sistema continua dono do seu dado.']
+};
+function render(){
+  document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === view || (b.dataset.view === 'config' && view.startsWith('cfg-'))));
+  document.getElementById('q').classList.toggle('hidden', view !== 'pay');
+  document.getElementById('store').classList.toggle('hidden', view !== 'pay');
+  if (view === 'config') return renderConfig();
+  if (view.startsWith('cfg-')) return renderCfg(view.slice(4));
+  if (MODULOS[view]) {
+    const [titulo] = MODULOS[view];
+    document.getElementById('content').innerHTML = `<div class="dev"><img src="logo-meridian.png" alt="Meridian Finance"><div class="devtag">Em desenvolvimento</div><h1>${titulo}</h1></div>`;
+    return;
+  }
+  const rows = visible();
+  const abertas = expenses.filter(open);
+  document.getElementById('count').textContent = abertas.length;
+  const chips = [['Todas','Todas'],['Pronta','Pronta'],['Vencidas','Vencidas'],['boleto','Boleto'],['guia','Guia'],['dinheiro','Dinheiro'],['online','Online']];
+  document.getElementById('content').innerHTML = `
+    <div class="headline"><div>
+      <div class="eyebrow">Execução</div>
+      <h1>Contas a pagar</h1>
+      <div class="sub">Fila única • a origem da despesa e a conta que paga podem ser diferentes</div>
+    </div><button class="btn primary" id="new" type="button">+ Nova despesa</button></div>
+    <div class="grid4">
+      ${metric('▣','o','A pagar', BRL(sum(abertas)), abertas.length + ' em aberto')}
+      ${metric('✓','g','Pago', BRL(sum(expenses.filter(e => e.status==='paga' || e.status==='conciliada'))), 'já baixadas')}
+      ${metric('⏱','y','Pronta', BRL(sum(expenses.filter(e => e.status==='pronta'))), 'aguardando o Felipe')}
+      ${metric('!','r','Vencida', BRL(sum(expenses.filter(overdue))), expenses.filter(overdue).length + ' sem pagar')}
+    </div>
+    <div class="section chips">${chips.map(([id,label]) => `<button class="chip ${id===chip?'active':''}" data-chip="${id}" type="button">${label}</button>`).join('')}</div>
+    <div class="section tablewrap"><table><thead><tr>
+      <th>Status</th><th>Descrição</th><th>Origem</th><th>Código</th><th>Plano</th><th>Vencimento</th><th>Conta de saída</th><th class="right">Valor</th><th></th>
+    </tr></thead><tbody>${rows.map(e => `<tr>
+      <td><span class="status ${esc(e.status)}">${LABELS[e.status] || esc(e.status)}</span></td>
+      <td><b>${esc(e.descricao)}</b><div class="tdsub">${esc(e.fornecedor || 'Sem fornecedor')}${e.documento_ref ? ' • ' + esc(e.documento_ref) : ''}</div></td>
+      <td>${esc(e.origem)}</td>
+      <td>${CODIGOS[e.forma_pagamento] ? `<span class="pill labor">${CODIGOS[e.forma_pagamento]}</span>` : esc(FORMAS[e.forma_pagamento] || '—')}</td>
+      <td>${esc(e.plano || '—')}</td>
+      <td>${e.vencimento ? esc(e.vencimento.split('-').reverse().join('/')) : '—'}</td>
+      <td>${esc(contaLabel(e))}</td>
+      <td class="right money">${BRL(e.valor)}</td>
+      <td><button class="btn" data-open="${esc(e.id)}" type="button">Abrir</button></td>
+    </tr>`).join('') || `<tr><td colspan="9">Nenhuma despesa ainda. A primeira entra como rascunho.</td></tr>`}</tbody></table></div>`;
+  document.getElementById('new').onclick = openNew;
+  document.querySelectorAll('[data-chip]').forEach(b => b.onclick = () => { chip = b.dataset.chip; render(); });
+  document.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openExpense(b.dataset.open));
+}
+function metric(icon,cl,l,v,f){return `<div class="card metric"><div class="doticon ${cl}">${icon}</div><div><div class="label">${l}</div><div class="value">${v}</div><div class="foot">${f}</div></div></div>`}
+function openExpense(id){
+  const e = expenses.find(x => x.id === id);
+  const d = document.getElementById('drawer');
+  d.classList.remove('hidden');
+  d.innerHTML = `<button class="close" id="x" type="button">×</button>
+    <div class="eyebrow">${LABELS[e.status] || ''}</div><h2>${esc(e.descricao)}</h2>
+    <div class="metric"><div><div class="label">Valor</div><div class="value">${BRL(e.valor)}</div></div></div>
+    <div class="field"><label>Origem</label><input value="${esc(e.origem_razao || e.origem)}" readonly></div>
+    <div class="field"><label>Fornecedor</label><input value="${esc(e.fornecedor || '')}" readonly></div>
+    <div class="field"><label>Plano de contas</label><input value="${esc(e.plano || '')}" readonly></div>
+    <div class="field"><label>Código</label><input value="${esc(CODIGOS[e.forma_pagamento] || FORMAS[e.forma_pagamento] || '—')}" readonly></div>
+    <div class="field"><label>Conta de saída</label><input value="${esc(contaLabel(e))}" readonly></div>
+    <div class="card ai"><b>Preparação</b><div class="tdsub">${e.status==='bloqueada_duplicata' ? 'Documento repetido nesta origem. Travado até o financeiro revisar.' : 'Rascunho. O financeiro prepara. O Felipe autoriza. Nada segue ao banco antes disso.'}</div></div>`;
+  document.getElementById('x').onclick = closeDrawer;
+}
+function openNew(){
+  fornecedorId = null;
+  const lojas = empresas.filter(e => e.tipo === 'loja');
+  const d = document.getElementById('drawer');
+  d.classList.remove('hidden');
+  d.innerHTML = `<button class="close" id="x" type="button">×</button>
+    <div class="eyebrow">Nova despesa</div><h2>Rascunho</h2>
+    <div class="field"><label>Descrição</label><input id="nDesc" placeholder="Ex.: Aluguel da Rei"></div>
+    <div class="field"><label>Valor</label><input id="nVal" placeholder="0,00"></div>
+    <div class="field"><label>Vencimento</label><input id="nVenc" type="date"></div>
+    <div class="field"><label>Documento</label><input id="nDoc" placeholder="NF, guia ou referência"></div>
+    <div class="field"><label>Como pagar</label><select id="nForma"></select></div>
+    <div class="field"><label>Onde o serviço aconteceu</label><select id="nOri">${lojas.map(e => `<option value="${e.id}">${esc(e.apelido)}</option>`).join('')}</select></div>
+    <div class="field"><label>Pagar pela conta de</label><select id="nDona"><option value="">A mesma empresa</option>${empresas.map(e => `<option value="${e.id}">${esc(e.apelido)}</option>`).join('')}</select></div>
+    <div class="field"><label>Conta de saída</label><select id="nConta"></select></div>
+    <div class="field"><label>Plano de contas</label><select id="nPlano"><option value="">Sem classificação</option>${plano.map(p => `<option value="${p.id}">${esc(p.nome)}</option>`).join('')}</select></div>
+    <div class="field"><label>Fornecedor</label><input id="nFor" placeholder="Buscar nome" autocomplete="off"><div id="nHits"></div></div>
+    <button class="btn primary" id="save" style="width:100%" type="button">Criar rascunho</button>`;
+  document.getElementById('x').onclick = closeDrawer;
+  const donaConta = () => document.getElementById('nDona').value || document.getElementById('nOri').value;
+  const preencherContas = () => {
+    const id = donaConta();
+    const lista = contas.filter(c => c.empresa_id === id);
+    document.getElementById('nConta').innerHTML = lista.map(c => `<option value="${c.id}">${esc(c.nome)}</option>`).join('') || '<option value="">Sem conta nesta empresa</option>';
+  };
+  document.getElementById('nOri').onchange = () => {
+    if (!document.getElementById('nDona').value) preencherContas();
+  };
+  document.getElementById('nDona').onchange = preencherContas;
+  preencherContas();
+  opcoesCodigo('');
+  document.getElementById('nPlano').onchange = () => {
+    const opt = document.getElementById('nPlano').selectedOptions[0];
+    opcoesCodigo(opt ? opt.textContent : '');
+  };
+  document.getElementById('nFor').oninput = async (ev) => {
+    fornecedorId = null;
+    const q = ev.target.value.trim();
+    const box = document.getElementById('nHits');
+    if (q.length < 2) { box.innerHTML = ''; return }
+    const hits = await fetch('/api/fornecedores?q=' + encodeURIComponent(q)).then(r => r.json());
+    box.innerHTML = hits.map(h => `<button class="btn" type="button" data-for="${h.id}" data-plano="${h.plano_conta_id || ''}" data-plano-nome="${esc(h.plano || '')}" style="display:block;width:100%;margin-top:6px;text-align:left">${esc(h.nome)}</button>`).join('');
+    box.querySelectorAll('[data-for]').forEach(b => b.onclick = () => {
+      fornecedorId = b.dataset.for;
+      document.getElementById('nFor').value = b.textContent;
+      if (b.dataset.plano) document.getElementById('nPlano').value = b.dataset.plano;
+      opcoesCodigo(b.dataset.planoNome || '');
+      box.innerHTML = '';
+    });
+  };
+  document.getElementById('save').onclick = async () => {
+    const valor = Number(String(document.getElementById('nVal').value).replace(/\./g,'').replace(',','.'));
+    const res = await fetch('/api/despesas', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({
+      descricao: document.getElementById('nDesc').value.trim(),
+      valor, vencimento: document.getElementById('nVenc').value || null,
+      documento_ref: document.getElementById('nDoc').value.trim() || null,
+      forma_pagamento: document.getElementById('nForma').value,
+      empresa_origem_id: document.getElementById('nOri').value,
+      conta_saida_id: document.getElementById('nConta').value || null,
+      plano_conta_id: document.getElementById('nPlano').value || null,
+      fornecedor_id: fornecedorId
+    })});
+    const data = await res.json();
+    if (!res.ok) { toast(data.erro || 'Não salvou'); return }
+    closeDrawer();
+    toast(data.status === 'bloqueada_duplicata' ? 'Travada: documento repetido' : 'Rascunho criado');
+    await carregar();
+  };
+}
+function cabeca(titulo, sub){
+  return `<div class="headline"><div><button class="btn" id="voltar" type="button">Voltar</button><h1 style="margin-top:14px">${titulo}</h1><div class="sub">${sub}</div></div></div>`;
+}
+function renderConfig(){
+  document.getElementById('count').textContent = expenses.filter(open).length;
+  const cards = [
+    ['empresas','Empresas','Lojas e holdings. A loja entra com BK.'],
+    ['contas','Contas bancárias','Itaú e Banco do Brasil de cada empresa.'],
+    ['plano','Plano de contas','Classificação do que é a pagar.'],
+    ['fornecedores','Fornecedores','Cadastro financeiro e o plano padrão.'],
+    ['formas','Formas de pagamento','Boleto e guia no geral. Folha, cadastro e PIX só no freelancer.'],
+    ['usuarios','Usuários','Quem prepara e quem autoriza.']
+  ];
+  document.getElementById('content').innerHTML = `
+    <div class="headline"><div><div class="eyebrow">Sistema</div><h1>Configuração</h1><div class="sub">Cada assunto na sua tela</div></div></div>
+    <div class="cfg">${cards.map(([id,t,s]) => `<button type="button" data-cfg="${id}"><b>${t}</b><span>${s}</span></button>`).join('')}</div>`;
+  document.querySelectorAll('[data-cfg]').forEach(b => b.onclick = () => { view = 'cfg-' + b.dataset.cfg; render(); });
+}
+function renderCfg(id){
+  const voltar = () => { document.getElementById('voltar').onclick = () => { view = 'config'; render(); }; };
+  if (id === 'empresas') {
+    document.getElementById('content').innerHTML = cabeca('Empresas', empresas.length + ' cadastros') + `<div class="tablewrap"><table><thead><tr><th>Empresa</th><th>Tipo</th><th>Razão social</th></tr></thead><tbody>${empresas.map(e => `<tr><td><b>${esc(e.apelido)}</b></td><td>${e.tipo==='loja'?'Loja':'Holding'}</td><td>${esc(e.razao_social)}</td></tr>`).join('')}</tbody></table></div>`;
+    return voltar();
+  }
+  if (id === 'contas') {
+    document.getElementById('content').innerHTML = cabeca('Contas bancárias', contas.length + ' contas') + `<div class="tablewrap"><table><thead><tr><th>Nome</th><th>Tipo</th><th>Empresa</th></tr></thead><tbody>${contas.map(c => `<tr><td><b>${esc(c.nome)}</b></td><td>${c.tipo==='dinheiro'?'Conta Dinheiro':'Conta Corrente'}</td><td>${esc(c.apelido)}</td></tr>`).join('')}</tbody></table></div>`;
+    return voltar();
+  }
+  if (id === 'plano') {
+    document.getElementById('content').innerHTML = cabeca('Plano de contas', plano.length + ' contas a pagar') + `<div class="section"><input class="search" id="planoQ" placeholder="Buscar plano"></div><div class="section tablewrap" id="planoBox"></div>`;
+    const pintar = () => {
+      const q = document.getElementById('planoQ').value.trim().toLowerCase();
+      const rows = plano.filter(p => !q || p.nome.toLowerCase().includes(q)).slice(0, 50);
+      document.getElementById('planoBox').innerHTML = `<table><thead><tr><th>Nome</th></tr></thead><tbody>${rows.map(p => `<tr><td>${esc(p.nome)}</td></tr>`).join('') || '<tr><td>Nenhum plano.</td></tr>'}</tbody></table>`;
+    };
+    document.getElementById('planoQ').oninput = pintar;
+    pintar();
+    return voltar();
+  }
+  if (id === 'fornecedores') {
+    document.getElementById('content').innerHTML = cabeca('Fornecedores', 'Busca no cadastro financeiro') + `<div class="section"><input class="search" id="forQ" placeholder="Nome do fornecedor"></div><div class="section tablewrap" id="forBox"></div>`;
+    document.getElementById('forQ').oninput = async (ev) => {
+      const q = ev.target.value.trim();
+      const box = document.getElementById('forBox');
+      if (q.length < 2) { box.innerHTML = ''; return; }
+      const hits = await fetch('/api/fornecedores?q=' + encodeURIComponent(q)).then(r => r.json());
+      box.innerHTML = `<table><thead><tr><th>Nome</th><th>Plano padrão</th></tr></thead><tbody>${hits.map(h => `<tr><td><b>${esc(h.nome)}</b></td><td>${esc(h.plano || '—')}</td></tr>`).join('') || '<tr><td colspan="2">Nenhum fornecedor.</td></tr>'}</tbody></table>`;
+    };
+    return voltar();
+  }
+  if (id === 'formas') {
+    document.getElementById('content').innerHTML = cabeca('Formas de pagamento', 'O código muda conforme o tipo da despesa') + `<div class="grid2"><div class="card"><h3>Despesa em geral</h3><div class="sub">Boleto, guia, dinheiro e online.</div></div><div class="card"><h3>Freelancer e treinamento</h3><div class="sub">Folha, cadastro ou chave PIX. A empresa em que a pessoa é registrada vem do FreeControl.</div></div></div>`;
+    return voltar();
+  }
+  document.getElementById('content').innerHTML = cabeca('Usuários', 'Dois papéis. A IA não autoriza.') + `<div class="grid2"><div class="card"><h3>Financeiro</h3><div class="sub">Prepara o lançamento, do rascunho até deixar pronto.</div></div><div class="card"><h3>Felipe</h3><div class="sub">Autoriza o que está pronto. Sem essa autorização nada segue ao banco.</div></div></div>`;
+  voltar();
+}
+function closeDrawer(){document.getElementById('drawer').classList.add('hidden')}
+function toast(t){const x=document.getElementById('toast');x.textContent=t;x.classList.remove('hidden');setTimeout(()=>x.classList.add('hidden'),2200)}
+async function carregar(){
+  const store = document.getElementById('store').value;
+  expenses = await fetch('/api/despesas' + (store ? '?empresa=' + store : '')).then(r => r.json());
+  render();
+}
+document.getElementById('q').oninput = () => { if (view === 'pay') render(); };
+document.getElementById('store').onchange = () => { if (view === 'pay') carregar(); };
+document.querySelectorAll('[data-view]').forEach(b => b.onclick = () => { view = b.dataset.view; closeDrawer(); view === 'pay' ? carregar() : render(); });
+Promise.all([fetch('/api/empresas').then(r=>r.json()), fetch('/api/contas').then(r=>r.json()), fetch('/api/plano').then(r=>r.json())]).then(([e,c,p]) => {
+  empresas = e; contas = c; plano = p;
+  const sel = document.getElementById('store');
+  e.filter(x => x.tipo === 'loja').forEach(loja => {
+    const o = document.createElement('option');
+    o.value = loja.id; o.textContent = loja.apelido; sel.appendChild(o);
+  });
+  carregar();
+});
+</script>
+</body>
+</html>

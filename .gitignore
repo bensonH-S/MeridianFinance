@@ -1,6 +1,7 @@
 node_modules/
 dist/
 build/
+*.tsbuildinfo
 .env
 .env.*
 !.env.example
@@ -16,3 +17,4 @@ venv/
 tmp/
 uploads/
 *.local
+Dados Grupo Alvim/

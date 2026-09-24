@@ -1,0 +1,25 @@
+:root {
+  --ga-orange: #ff5a0a;
+  --ga-canvas: #060b10;
+  --ga-surface: #0c141c;
+  --ga-sidebar: #060b10;
+  --ga-sidebar-active-bg: linear-gradient(90deg, rgba(255, 90, 10, 0.2), rgba(255, 90, 10, 0.06));
+  --ga-sidebar-active-text: #ffffff;
+  --ga-sidebar-active-border: #ff5a0a;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #060b10;
+  color: #f5f7fa;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
