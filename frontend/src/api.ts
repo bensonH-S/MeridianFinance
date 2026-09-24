@@ -47,6 +47,12 @@ export const api = {
     if (!res.ok) throw new Error(data.erro || 'Não salvou')
     return data as { id: string; status: string }
   },
+  excluirDespesa: async (id: string) => {
+    const res = await fetch(`${apiRoot}/despesas/${id}`, { method: 'DELETE' })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.erro || 'Não excluiu')
+    return data as { id: string }
+  },
   atualizarDespesa: async (id: string, body: Record<string, unknown>) => {
     const res = await fetch(`${apiRoot}/despesas/${id}`, {
       method: 'PATCH',

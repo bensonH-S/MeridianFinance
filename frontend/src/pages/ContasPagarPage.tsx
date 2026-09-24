@@ -3,6 +3,10 @@ import Autocomplete from '@mui/material/Autocomplete'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Chip from '@mui/material/Chip'
+import Dialog from '@mui/material/Dialog'
+import DialogActions from '@mui/material/DialogActions'
+import DialogContent from '@mui/material/DialogContent'
+import DialogTitle from '@mui/material/DialogTitle'
 import Drawer from '@mui/material/Drawer'
 import IconButton from '@mui/material/IconButton'
 import MenuItem from '@mui/material/MenuItem'
@@ -20,14 +24,14 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import { api, brl, type Conta, type Despesa, type Empresa, type Fornecedor, type Plano } from '../api'
 
 const STATUS: Record<string, string> = {
-  rascunho: 'Rascunho', classificada: 'Classificada', pronta: 'Pronta', autorizada: 'Autorizada',
+  rascunho: 'Rascunho', classificada: 'Classificada', pronta: 'Para autorizar', autorizada: 'Autorizada',
   enviada: 'Enviada', paga: 'Paga', conciliada: 'Conciliada', bloqueada_duplicata: 'Duplicata',
 }
 const CODIGO: Record<string, string> = {
   folha: 'Folha', cadastro: 'Cadastro', chave_pix: 'Chave PIX',
   boleto: 'Boleto', guia: 'Guia', dinheiro: 'Dinheiro', online: 'Online',
 }
-const FILTROS = ['Todas', 'Pronta', 'Vencidas', 'boleto', 'guia', 'dinheiro', 'online'] as const
+const FILTROS = ['Todas', 'Para autorizar', 'Vencidas'] as const
 
 const aberta = (e: Despesa) => !['paga', 'conciliada', 'cancelada'].includes(e.status)
 const hoje = new Date().toISOString().slice(0, 10)
@@ -42,6 +46,9 @@ export function ContasPagarPage() {
   const [filtro, setFiltro] = useState<(typeof FILTROS)[number]>('Todas')
   const [aberto, setAberto] = useState(false)
   const [editando, setEditando] = useState<Despesa | null>(null)
+  const [excluir, setExcluir] = useState<Despesa | null>(null)
+  const [excluindo, setExcluindo] = useState(false)
+  const [erroExcluir, setErroExcluir] = useState('')
 
   const carregar = (empresa = loja) => api.despesas(empresa || undefined).then(setDespesas).catch(() => setDespesas([]))
 
@@ -55,9 +62,8 @@ export function ContasPagarPage() {
   const linhas = useMemo(() => despesas.filter((e) => {
     const texto = `${e.descricao} ${e.fornecedor ?? ''} ${e.origem} ${e.plano ?? ''}`.toLowerCase()
     if (busca && !texto.includes(busca.toLowerCase())) return false
-    if (filtro === 'Pronta') return e.status === 'pronta'
+    if (filtro === 'Para autorizar') return e.status === 'pronta'
     if (filtro === 'Vencidas') return aberta(e) && !!e.vencimento && e.vencimento < hoje
-    if (filtro !== 'Todas') return e.forma_pagamento === filtro
     return true
   }), [despesas, busca, filtro])
 
@@ -79,7 +85,7 @@ export function ContasPagarPage() {
       <Stack direction="row" spacing={1.5} sx={{ flexWrap: 'wrap' }}>
         <Resumo rotulo="A pagar" valor={brl(soma(aberta))} detalhe={`${despesas.filter(aberta).length} em aberto`} />
         <Resumo rotulo="Pago" valor={brl(soma((e) => e.status === 'paga' || e.status === 'conciliada'))} detalhe="já baixadas" />
-        <Resumo rotulo="Pronta" valor={brl(soma((e) => e.status === 'pronta'))} detalhe="aguardando o Felipe" />
+        <Resumo rotulo="Para autorizar" valor={brl(soma((e) => e.status === 'pronta'))} detalhe="aguardando o Felipe" />
         <Resumo rotulo="Vencida" valor={brl(soma((e) => aberta(e) && !!e.vencimento && e.vencimento < hoje))} detalhe="sem pagar" />
       </Stack>
 
@@ -130,12 +136,44 @@ export function ContasPagarPage() {
                 <TableCell align="right" sx={{ fontWeight: 600, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>{brl(Number(e.valor))}</TableCell>
                 <TableCell align="right">
                   <Button size="small" onClick={() => setEditando(e)} sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main', bgcolor: 'transparent' } }}>Abrir</Button>
+                  <Button size="small" onClick={() => { setErroExcluir(''); setExcluir(e) }} sx={{ color: 'text.secondary', '&:hover': { color: 'error.main', bgcolor: 'transparent' } }}>Excluir</Button>
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </Paper>
+
+      <Dialog open={!!excluir} onClose={() => { if (!excluindo) setExcluir(null) }}>
+        <DialogTitle>Deseja excluir?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2">{excluir?.descricao}</Typography>
+          {erroExcluir && <Typography color="error" variant="body2" sx={{ mt: 1 }}>{erroExcluir}</Typography>}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setExcluir(null)} disabled={excluindo}>Cancelar</Button>
+          <Button
+            color="error"
+            variant="contained"
+            disabled={excluindo}
+            onClick={async () => {
+              if (!excluir) return
+              setExcluindo(true)
+              try {
+                await api.excluirDespesa(excluir.id)
+                setExcluir(null)
+                carregar()
+              } catch (err) {
+                setErroExcluir(err instanceof Error ? err.message : 'Não excluiu')
+              } finally {
+                setExcluindo(false)
+              }
+            }}
+          >
+            Excluir
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <DespesaForm
         aberto={aberto || !!editando}

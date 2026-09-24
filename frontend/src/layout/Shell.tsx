@@ -82,7 +82,7 @@ export function Shell() {
         >
           <Box
             component="img"
-            src={`${import.meta.env.BASE_URL}logo-central.png?v=7`}
+            src={`${import.meta.env.BASE_URL}logo-central.png?v=12`}
             alt="Central GA"
             sx={{ width: '100%', maxHeight: 40, objectFit: 'contain', display: 'block' }}
           />

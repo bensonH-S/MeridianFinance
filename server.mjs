@@ -219,6 +219,12 @@ const server = http.createServer(async (req, res) => {
       if (!updated.rowCount) return send(res, 404, JSON.stringify({ erro: 'Despesa não encontrada.' }))
       return send(res, 200, JSON.stringify(updated.rows[0]))
     }
+    if (req.method === 'DELETE' && url.pathname.startsWith('/api/despesas/')) {
+      const id = url.pathname.split('/').pop()
+      const deleted = await pool.query('delete from despesas where id = $1 returning id', [id])
+      if (!deleted.rowCount) return send(res, 404, JSON.stringify({ erro: 'Despesa não encontrada.' }))
+      return send(res, 200, JSON.stringify(deleted.rows[0]))
+    }
     if (req.method === 'GET' && !url.pathname.startsWith('/api')) {
       const dist = path.join(root, 'frontend', 'dist')
       if (process.env.NODE_ENV === 'production' && fs.existsSync(dist)) {
