@@ -13,6 +13,15 @@ const root = path.dirname(fileURLToPath(import.meta.url))
 const port = Number(process.env.PORT || 5080)
 
 function loadMeridianEnv() {
+  if (process.env.DB_HOST && process.env.DB_USER && process.env.DB_PASS) {
+    return {
+      DB_HOST: process.env.DB_HOST,
+      DB_USER: process.env.DB_USER,
+      DB_PASS: process.env.DB_PASS,
+      DB_NAME: process.env.DB_NAME,
+      DB_PORT: process.env.DB_PORT,
+    }
+  }
   const candidates = [
     process.env.ENV_FILE,
     path.resolve(root, '.env'),
@@ -415,7 +424,7 @@ const server = http.createServer(async (req, res) => {
             documento_ref, numero_nf, cnpj_cedente, competencia, vencimento, valor, forma_pagamento, dados_pagamento, status
           ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'boleto',$11,$12)
         `, [
-          (linha.cedente || 'Boleto DDA').slice(0, 180),
+          '',
           linha.fornecedor_id,
           linha.empresa_id,
           linha.plano_conta_id,

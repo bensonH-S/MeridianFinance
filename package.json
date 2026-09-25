@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node server.mjs"
+    "start": "node server.mjs",
+    "local": "node scripts/subir-local.mjs"
   },
   "dependencies": {
     "nfe-danfe-pdf": "^1.0.3",

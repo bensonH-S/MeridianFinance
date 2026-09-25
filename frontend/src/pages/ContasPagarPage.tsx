@@ -88,12 +88,6 @@ export function ContasPagarPage() {
   const [aviso, setAviso] = useState('')
   const [erroExcluir, setErroExcluir] = useState('')
   const [marcadas, setMarcadas] = useState<string[]>([])
-  const [classificando, setClassificando] = useState(false)
-  const [fornecedorLote, setFornecedorLote] = useState<Fornecedor | null>(null)
-  const [buscaLote, setBuscaLote] = useState('')
-  const [hitsLote, setHitsLote] = useState<Fornecedor[]>([])
-  const [aplicandoLote, setAplicandoLote] = useState(false)
-  const [erroLote, setErroLote] = useState('')
 
   const carregar = (empresa = loja) => api.despesas(empresa || undefined).then(setDespesas).catch(() => setDespesas([]))
 
@@ -156,46 +150,6 @@ export function ContasPagarPage() {
     URL.revokeObjectURL(url)
   }
 
-  const aplicarLote = async () => {
-    if (!fornecedorLote) return
-    setAplicandoLote(true)
-    setErroLote('')
-    try {
-      await Promise.all(selecionadas.map((e) => api.atualizarDespesa(e.id, {
-        descricao: e.descricao,
-        valor: Number(e.valor),
-        vencimento: e.vencimento,
-        documento_ref: e.documento_ref,
-        forma_pagamento: e.forma_pagamento,
-        empresa_origem_id: e.origem_id,
-        conta_saida_id: e.conta_saida_id,
-        plano_conta_id: fornecedorLote.plano_conta_id,
-        fornecedor_id: fornecedorLote.id,
-        dados_pagamento: e.pagamento,
-        competencia: e.competencia,
-        status: fornecedorLote.plano_conta_id ? 'classificada' : e.status,
-      })))
-      setClassificando(false)
-      setFornecedorLote(null)
-      setBuscaLote('')
-      setMarcadas([])
-      carregar()
-      setAviso(fornecedorLote.plano_conta_id
-        ? `${selecionadas.length} despesa${selecionadas.length === 1 ? '' : 's'} classificada${selecionadas.length === 1 ? '' : 's'}.`
-        : 'Fornecedor aplicado. Sem plano padrão, o status não mudou.')
-    } catch (err) {
-      setErroLote(err instanceof Error ? err.message : 'Não classificou')
-    } finally {
-      setAplicandoLote(false)
-    }
-  }
-
-  const nota = (e: Despesa) => {
-    const doc = e.documento_ref && !e.documento_ref.startsWith('BANCO-') && !e.documento_ref.startsWith('DDA|') && e.documento_ref.length <= 20
-      ? `NF ${e.documento_ref}` : ''
-    return [e.fornecedor, e.plano, doc].filter(Boolean).join(' · ')
-  }
-
   return (
     <Stack spacing={2} sx={{ height: '100%', minHeight: 0 }}>
       <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} sx={{ alignItems: { md: 'center' } }}>
@@ -247,7 +201,6 @@ export function ContasPagarPage() {
           <Box sx={{ flex: 1 }} />
           <Button size="small" onClick={() => setMarcadas([])}>Limpar</Button>
           <Button size="small" variant="outlined" onClick={exportar}>Exportar</Button>
-          <Button size="small" variant="contained" color="secondary" onClick={() => { setFornecedorLote(null); setBuscaLote(''); setHitsLote([]); setClassificando(true) }}>Classificar selecionados</Button>
         </Stack>
       )}
 
@@ -266,7 +219,7 @@ export function ContasPagarPage() {
                 />
               </TableCell>
               {['Status', 'Descrição', 'Origem', 'Nota fiscal', 'Forma de pagamento', 'Código', 'Vencimento', 'Valor', ''].map((h) => (
-                <TableCell key={h || 'acao'} align={h === 'Valor' ? 'right' : 'left'}>{h}</TableCell>
+                <TableCell key={h || 'acao'} align={h === 'Valor' ? 'right' : h === 'Nota fiscal' ? 'center' : 'left'} sx={h === 'Nota fiscal' ? { width: 88 } : undefined}>{h}</TableCell>
               ))}
             </TableRow>
           </TableHead>
@@ -285,20 +238,19 @@ export function ContasPagarPage() {
                   <Chip size="small" label={STATUS[e.status] || e.status} variant="outlined" sx={{ height: 22, fontWeight: 500, color: tom.color, borderColor: tom.border, bgcolor: tom.bg }} />
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontWeight: 500 }}>{e.descricao}</Typography>
-                  {e.fornecedor
-                    ? <Typography variant="caption" sx={{ display: 'block', color: '#C3CED6', lineHeight: 1.35 }}>{nota(e)}</Typography>
-                    : <Chip size="small" label="Sem fornecedor" variant="outlined" sx={{ mt: 0.5, height: 22, color: '#FFB4B4', borderColor: '#E23B3B', bgcolor: 'rgba(226,59,59,0.14)', fontWeight: 600 }} />}
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{e.descricao.trim() || 'Sem descrição'}</Typography>
                 </TableCell>
                 <TableCell>{e.origem}</TableCell>
-                <TableCell>
-                  {e.nf_confirmada
-                    ? <Chip size="small" icon={<CheckIcon />} label="NF confirmada" sx={{ bgcolor: '#1F8A4C', color: '#fff', fontWeight: 600, '& .MuiChip-icon': { color: '#fff' } }} />
-                    : (
-                      <Tooltip title="NF pendente">
-                        <AttachFileOutlinedIcon aria-label="NF pendente" sx={{ fontSize: 18, color: '#9AABBA', transform: 'rotate(35deg)' }} />
-                      </Tooltip>
-                    )}
+                <TableCell align="center" sx={{ verticalAlign: 'middle', width: 88, px: 0 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 24 }}>
+                    {e.nf_confirmada
+                      ? <Chip size="small" icon={<CheckIcon />} label="NF confirmada" sx={{ bgcolor: '#1F8A4C', color: '#fff', fontWeight: 600, '& .MuiChip-icon': { color: '#fff' } }} />
+                      : (
+                        <Tooltip title="NF pendente">
+                          <AttachFileOutlinedIcon aria-label="NF pendente" sx={{ fontSize: 18, color: '#9AABBA', display: 'block' }} />
+                        </Tooltip>
+                      )}
+                  </Box>
                 </TableCell>
                 <TableCell>{CODIGO[e.forma_pagamento || ''] || '—'}</TableCell>
                 <TableCell><Codigo forma={e.forma_pagamento} pagamento={e.pagamento} /></TableCell>
@@ -358,40 +310,6 @@ export function ContasPagarPage() {
             }}
           >
             Excluir
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog open={classificando} onClose={() => { if (!aplicandoLote) setClassificando(false) }} fullWidth maxWidth="xs">
-        <DialogTitle>Classificar selecionados</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" sx={{ mb: 1.5 }}>{marcadas.length} despesa{marcadas.length === 1 ? '' : 's'}. O fornecedor e o plano padrão valem para todas.</Typography>
-          <Autocomplete
-            size="small"
-            options={hitsLote}
-            getOptionLabel={(item) => item.nome}
-            filterOptions={(opcoes) => opcoes}
-            inputValue={buscaLote}
-            value={fornecedorLote}
-            onInputChange={(_, texto, motivo) => {
-              if (motivo !== 'input') return
-              setBuscaLote(texto)
-              if (texto.trim().length < 2) { setHitsLote([]); return }
-              api.fornecedores(texto.trim()).then(setHitsLote).catch(() => setHitsLote([]))
-            }}
-            onChange={(_, item) => { setFornecedorLote(item); setBuscaLote(item?.nome || '') }}
-            renderInput={(params) => <TextField {...params} label="Fornecedor" placeholder="Buscar" autoFocus />}
-            renderOption={(props, item) => (
-              <li {...props} key={item.id}>{item.nome}{item.plano ? ` · ${item.plano}` : ''}</li>
-            )}
-          />
-          {fornecedorLote?.plano && <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Plano: {fornecedorLote.plano}</Typography>}
-          {erroLote && <Typography color="error" variant="body2" sx={{ mt: 1 }}>{erroLote}</Typography>}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setClassificando(false)} disabled={aplicandoLote}>Cancelar</Button>
-          <Button variant="contained" color="secondary" disabled={!fornecedorLote || aplicandoLote} onClick={aplicarLote}>
-            {aplicandoLote ? 'Classificando…' : 'Classificar'}
           </Button>
         </DialogActions>
       </Dialog>
