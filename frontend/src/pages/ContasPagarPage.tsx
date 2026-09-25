@@ -4,7 +4,6 @@ import Alert from '@mui/material/Alert'
 import Autocomplete from '@mui/material/Autocomplete'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
-import Checkbox from '@mui/material/Checkbox'
 import Chip from '@mui/material/Chip'
 import Dialog from '@mui/material/Dialog'
 import DialogActions from '@mui/material/DialogActions'
@@ -31,9 +30,14 @@ import CheckIcon from '@mui/icons-material/Check'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import { api, brl, type Despesa, type Empresa, type Fornecedor } from '../api'
 
-const STATUS: Record<string, string> = {
-  rascunho: 'A classificar', classificada: 'Classificada', pronta: 'Para autorizar', autorizada: 'Autorizada',
-  enviada: 'Enviada', paga: 'Paga', conciliada: 'Conciliada', bloqueada_duplicata: 'Duplicata',
+function situacao(e: Despesa) {
+  if (e.status === 'conciliada') return { label: 'Conciliada', tom: 'conciliada' }
+  if (e.status === 'paga') return { label: 'Paga', tom: 'paga' }
+  if (e.status === 'enviada') return { label: 'Enviada', tom: 'enviada' }
+  if (e.status === 'autorizada') return { label: 'Autorizada', tom: 'autorizada' }
+  if (e.status === 'pronta') return { label: 'Para autorizar', tom: 'pronta' }
+  if (e.status === 'bloqueada_duplicata') return { label: 'Duplicata', tom: 'bloqueada_duplicata' }
+  return { label: 'A pagar', tom: 'a_pagar' }
 }
 const CODIGO: Record<string, string> = {
   folha: 'Folha', cadastro: 'Cadastro', chave_pix: 'Chave PIX',
@@ -50,6 +54,7 @@ const TOM_STATUS: Record<string, { color: string; border: string; bg: string }> 
   paga: { color: '#9DCFB3', border: '#1F6B3A', bg: 'transparent' },
   conciliada: { color: '#9DCFB3', border: '#1F6B3A', bg: 'transparent' },
   bloqueada_duplicata: { color: '#FFB4B4', border: '#E23B3B', bg: 'rgba(226,59,59,0.14)' },
+  a_pagar: { color: '#C5D0D8', border: '#3A4C5A', bg: 'transparent' },
 }
 
 const aberta = (e: Despesa) => !['paga', 'conciliada', 'cancelada'].includes(e.status)
@@ -87,7 +92,6 @@ export function ContasPagarPage() {
   const [excluindo, setExcluindo] = useState(false)
   const [aviso, setAviso] = useState('')
   const [erroExcluir, setErroExcluir] = useState('')
-  const [marcadas, setMarcadas] = useState<string[]>([])
 
   const carregar = (empresa = loja) => api.despesas(empresa || undefined).then(setDespesas).catch(() => setDespesas([]))
 
@@ -113,42 +117,13 @@ export function ContasPagarPage() {
     return true
   }), [noPeriodo, busca, filtro])
 
-  useEffect(() => { setPagina(0); setMarcadas([]) }, [busca, de, ate, loja, filtro])
+  useEffect(() => { setPagina(0) }, [busca, de, ate, loja, filtro])
 
   const visiveis = linhas.slice(pagina * porPagina, pagina * porPagina + porPagina)
-  const idsVisiveis = visiveis.map((e) => e.id)
-  const todasMarcadas = idsVisiveis.length > 0 && idsVisiveis.every((id) => marcadas.includes(id))
-  const selecionadas = despesas.filter((e) => marcadas.includes(e.id))
 
   const soma = (pred: (e: Despesa) => boolean) => noPeriodo.filter(pred).reduce((a, e) => a + Number(e.valor), 0)
   const lojas = empresas.filter((e) => e.tipo === 'loja')
   const vencida = soma((e) => aberta(e) && !!e.vencimento && e.vencimento < hoje)
-
-  const alternar = (id: string) => {
-    setMarcadas((atual) => atual.includes(id) ? atual.filter((item) => item !== id) : [...atual, id])
-  }
-
-  const exportar = () => {
-    const cabecalho = ['Status', 'Descrição', 'Fornecedor', 'Origem', 'Nota fiscal', 'Forma', 'Vencimento', 'Valor']
-    const corpo = selecionadas.map((e) => [
-      STATUS[e.status] || e.status,
-      e.descricao,
-      e.fornecedor || '',
-      e.origem,
-      e.nf_confirmada ? 'NF confirmada' : 'NF pendente',
-      CODIGO[e.forma_pagamento || ''] || '',
-      e.vencimento ? e.vencimento.split('-').reverse().join('/') : '',
-      String(e.valor).replace('.', ','),
-    ])
-    const csv = [cabecalho, ...corpo].map((linha) => linha.map((celula) => `"${String(celula).replace(/"/g, '""')}"`).join(';')).join('\n')
-    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = 'contas-a-pagar.csv'
-    link.click()
-    URL.revokeObjectURL(url)
-  }
 
   return (
     <Stack spacing={2} sx={{ height: '100%', minHeight: 0 }}>
@@ -195,29 +170,11 @@ export function ContasPagarPage() {
         ))}
       </Stack>
 
-      {marcadas.length > 0 && (
-        <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', px: 1.5, py: 1, borderRadius: 2, bgcolor: '#101C28', border: '1px solid #1C2A35' }}>
-          <Typography sx={{ fontSize: 13, fontWeight: 600 }}>{marcadas.length} selecionada{marcadas.length === 1 ? '' : 's'}</Typography>
-          <Box sx={{ flex: 1 }} />
-          <Button size="small" onClick={() => setMarcadas([])}>Limpar</Button>
-          <Button size="small" variant="outlined" onClick={exportar}>Exportar</Button>
-        </Stack>
-      )}
-
       <Paper variant="outlined" sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
         <Table size="small" stickyHeader>
           <TableHead>
             <TableRow>
-              <TableCell padding="checkbox">
-                <Checkbox
-                  size="small"
-                  checked={todasMarcadas}
-                  indeterminate={marcadas.some((id) => idsVisiveis.includes(id)) && !todasMarcadas}
-                  onChange={() => setMarcadas(todasMarcadas ? marcadas.filter((id) => !idsVisiveis.includes(id)) : [...new Set([...marcadas, ...idsVisiveis])])}
-                  slotProps={{ input: { 'aria-label': 'Selecionar página' } }}
-                />
-              </TableCell>
               {['Status', 'Descrição', 'Origem', 'Nota fiscal', 'Forma de pagamento', 'Código', 'Vencimento', 'Valor', ''].map((h) => (
                 <TableCell key={h || 'acao'} align={h === 'Valor' ? 'right' : h === 'Nota fiscal' ? 'center' : 'left'} sx={h === 'Nota fiscal' ? { width: 88 } : undefined}>{h}</TableCell>
               ))}
@@ -225,17 +182,15 @@ export function ContasPagarPage() {
           </TableHead>
           <TableBody>
             {linhas.length === 0 && (
-              <TableRow><TableCell colSpan={10} sx={{ color: 'text.secondary', py: 4 }}>Nenhuma despesa nesse filtro.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} sx={{ color: 'text.secondary', py: 4 }}>Nenhuma despesa nesse filtro.</TableCell></TableRow>
             )}
             {visiveis.map((e) => {
-              const tom = TOM_STATUS[e.status] || TOM_STATUS.rascunho
+              const estado = situacao(e)
+              const tom = TOM_STATUS[estado.tom] || TOM_STATUS.a_pagar
               return (
-              <TableRow key={e.id} hover selected={marcadas.includes(e.id)}>
-                <TableCell padding="checkbox">
-                  <Checkbox size="small" checked={marcadas.includes(e.id)} onChange={() => alternar(e.id)} slotProps={{ input: { 'aria-label': `Selecionar ${e.descricao}` } }} />
-                </TableCell>
+              <TableRow key={e.id} hover>
                 <TableCell>
-                  <Chip size="small" label={STATUS[e.status] || e.status} variant="outlined" sx={{ height: 22, fontWeight: 500, color: tom.color, borderColor: tom.border, bgcolor: tom.bg }} />
+                  <Chip size="small" label={estado.label} variant="outlined" sx={{ height: 22, fontWeight: 500, color: tom.color, borderColor: tom.border, bgcolor: tom.bg }} />
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>{e.descricao.trim() || 'Sem descrição'}</Typography>
