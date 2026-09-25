@@ -126,7 +126,7 @@ export function DdaPage() {
                 <TableCell>{linha.empresa || linha.sacado || '—'}</TableCell>
                 <TableCell>
                   {linha.fornecedor || linha.cedente || '—'}
-                  {linha.plano ? <Typography variant="caption" display="block" color="text.secondary">{linha.plano}</Typography> : null}
+                  {linha.plano ? <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{linha.plano}</Typography> : null}
                 </TableCell>
                 <TableCell>{dataBr(linha.vencimento)}</TableCell>
                 <TableCell align="right">{linha.valor == null ? '—' : brl(linha.valor)}</TableCell>

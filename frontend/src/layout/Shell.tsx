@@ -81,9 +81,8 @@ export function Shell() {
       >
         <Box
           sx={{
-            height: 64,
-            px: 1.5,
-            borderBottom: '1px solid #1C2A35',
+            height: 72,
+            px: 1.25,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -91,9 +90,9 @@ export function Shell() {
         >
           <Box
             component="img"
-            src={`${import.meta.env.BASE_URL}logo-central.png?v=12`}
+            src={`${import.meta.env.BASE_URL}logo-meridian.png?v=2`}
             alt="Central GA"
-            sx={{ width: '100%', maxHeight: 40, objectFit: 'contain', display: 'block' }}
+            sx={{ width: '100%', height: 'auto', display: 'block' }}
           />
         </Box>
 

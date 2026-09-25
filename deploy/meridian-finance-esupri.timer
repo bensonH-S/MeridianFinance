@@ -1,0 +1,11 @@
+[Unit]
+Description=Boletos e notas do eSupri às 6h e às 18h
+
+[Timer]
+OnCalendar=*-*-* 06:00:00
+OnCalendar=*-*-* 18:00:00
+Persistent=true
+Unit=meridian-finance-esupri.service
+
+[Install]
+WantedBy=timers.target

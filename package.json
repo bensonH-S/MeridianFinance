@@ -6,6 +6,7 @@
     "start": "node server.mjs"
   },
   "dependencies": {
+    "nfe-danfe-pdf": "^1.0.3",
     "pg": "^8.13.1",
     "xlsx": "^0.18.5"
   }

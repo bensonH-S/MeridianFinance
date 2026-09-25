@@ -5,6 +5,8 @@ import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import pg from 'pg'
 import { acharFornecedor, classificar, lerPlanilha } from './lib/dda.mjs'
+import { gerarDanfe } from './lib/danfe.mjs'
+import { baixarBoletoDaDespesa, baixarNotaDaDespesa } from './lib/boletoEsupri.mjs'
 import { cruzarNotas } from './lib/nfEntrada.mjs'
 
 const root = path.dirname(fileURLToPath(import.meta.url))
@@ -153,7 +155,7 @@ async function listarDespesas(empresaId) {
   const { rows } = await pool.query(`
     select d.id, d.descricao, d.valor::float8 as valor, to_char(d.vencimento, 'YYYY-MM-DD') as vencimento,
            to_char(d.competencia, 'YYYY-MM-DD') as competencia, d.forma_pagamento, d.status,
-           d.documento_ref, d.numero_nf, d.nf_confirmada, d.empresa_origem_id as origem_id, eo.apelido as origem, eo.razao_social as origem_razao,
+           d.documento_ref, d.numero_nf, d.nfe_id, d.nf_confirmada, d.empresa_origem_id as origem_id, eo.apelido as origem, eo.razao_social as origem_razao,
            er.apelido as registrado_em,
            d.fornecedor_id, f.nome as fornecedor, d.plano_conta_id, p.nome as plano,
            d.conta_saida_id, cs.nome as conta_nome, cs.empresa_id as conta_empresa_id,
@@ -186,6 +188,35 @@ const tipos = {
   '.ico': 'image/x-icon',
 }
 
+function enviarPdf(res, pdf, nome) {
+  res.writeHead(200, {
+    'content-type': 'application/pdf',
+    'content-disposition': `inline; filename="${nome}"`,
+    'cache-control': 'no-store',
+  })
+  res.end(pdf)
+}
+
+async function arquivoSalvo(id, coluna) {
+  if (coluna !== 'boleto_arquivo' && coluna !== 'nota_arquivo') return null
+  const { rows } = await pool.query(`select ${coluna} as arquivo from despesas where id = $1`, [id])
+  const relativo = rows[0]?.arquivo
+  if (!relativo) return null
+  const file = path.resolve(root, relativo)
+  const base = path.resolve(root, 'data', 'esupri')
+  if (!file.startsWith(base) || !fs.existsSync(file)) return null
+  return fs.readFileSync(file)
+}
+
+async function gravarDocumento(id, coluna, pasta, pdf) {
+  if (coluna !== 'boleto_arquivo' && coluna !== 'nota_arquivo') return
+  const dir = path.join(root, 'data', 'esupri', pasta)
+  fs.mkdirSync(dir, { recursive: true })
+  const relativo = `data/esupri/${pasta}/${id}.pdf`
+  fs.writeFileSync(path.join(root, relativo), pdf)
+  await pool.query(`update despesas set ${coluna} = $2 where id = $1`, [id, relativo])
+}
+
 function servirArquivo(res, file) {
   const ext = path.extname(file).toLowerCase()
   send(res, 200, fs.readFileSync(file), tipos[ext] || 'application/octet-stream')
@@ -201,6 +232,46 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'GET' && url.pathname === '/api/despesas') {
       return send(res, 200, JSON.stringify(await listarDespesas(url.searchParams.get('empresa') || '')))
+    }
+    if (req.method === 'GET' && /^\/api\/despesas\/[^/]+\/nota$/.test(url.pathname)) {
+      const id = url.pathname.split('/')[3]
+      const salvo = await arquivoSalvo(id, 'nota_arquivo')
+      if (salvo) return enviarPdf(res, salvo, `DANFE-${id}.pdf`)
+      const despesa = await pool.query('select nfe_id, numero_nf from despesas where id = $1', [id])
+      const nfeId = despesa.rows[0]?.nfe_id
+      if (nfeId) {
+        const nota = await operacional.query('select numero, xml_path from estoque_nfe where id_nfe = $1', [nfeId])
+        const xmlPath = nota.rows[0]?.xml_path ? String(nota.rows[0].xml_path).trim() : ''
+        if (xmlPath && fs.existsSync(xmlPath)) {
+          try {
+            const pdf = await gerarDanfe(fs.readFileSync(xmlPath, 'utf8'))
+            await gravarDocumento(id, 'nota_arquivo', 'notas', pdf)
+            return enviarPdf(res, pdf, `DANFE-NF-${nota.rows[0].numero || nfeId}.pdf`)
+          } catch (err) {
+            console.error(err.message)
+          }
+        }
+      }
+      try {
+        const arquivo = await baixarNotaDaDespesa({ root, env, pool, operacional, id })
+        await gravarDocumento(id, 'nota_arquivo', 'notas', arquivo.pdf)
+        return enviarPdf(res, arquivo.pdf, `DANFE-${String(arquivo.nota || 'nota').replace(/[^\w.-]+/g, '_')}.pdf`)
+      } catch (err) {
+        return send(res, err.status || 404, JSON.stringify({ erro: err.message || 'Não achei a nota fiscal.' }))
+      }
+    }
+    if (req.method === 'GET' && /^\/api\/despesas\/[^/]+\/boleto$/.test(url.pathname)) {
+      const id = url.pathname.split('/')[3]
+      const salvo = await arquivoSalvo(id, 'boleto_arquivo')
+      if (salvo) return enviarPdf(res, salvo, `BOLETO-${id}.pdf`)
+      let arquivo
+      try {
+        arquivo = await baixarBoletoDaDespesa({ root, env, pool, operacional, id })
+      } catch (err) {
+        return send(res, err.status || 502, JSON.stringify({ erro: err.message || 'Não abriu o boleto.' }))
+      }
+      await gravarDocumento(id, 'boleto_arquivo', 'boletos', arquivo.pdf)
+      return enviarPdf(res, arquivo.pdf, `BOLETO-${String(arquivo.nota || 'nota').replace(/[^\w.-]+/g, '_')}.pdf`)
     }
     if (req.method === 'GET' && url.pathname === '/api/empresas') {
       const { rows } = await pool.query(`
@@ -395,6 +466,8 @@ server.listen(port, '127.0.0.1', () => {
     alter table despesas add column if not exists cnpj_cedente text;
     alter table despesas add column if not exists nfe_id text;
     alter table despesas add column if not exists nf_confirmada boolean not null default false;
+    alter table despesas add column if not exists boleto_arquivo text;
+    alter table despesas add column if not exists nota_arquivo text;
   `).catch((err) => {
     console.error(err.message)
   })

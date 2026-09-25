@@ -16,5 +16,6 @@ __pycache__/
 venv/
 tmp/
 uploads/
+data/
 *.local
 Dados Grupo Alvim/

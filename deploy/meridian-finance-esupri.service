@@ -1,0 +1,9 @@
+[Unit]
+Description=Baixa boletos e DANFE do eSupri para o Meridian Finance
+After=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/var/www/app/meridian-finance
+ExecStart=/usr/bin/node scripts/sync-esupri-documentos.mjs --dias=60
+Nice=10

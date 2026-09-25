@@ -8,7 +8,7 @@ export default defineConfig(({ command }) => ({
     host: '127.0.0.1',
     port: 5176,
     proxy: {
-      '/api': 'http://127.0.0.1:5080',
+      '/api': { target: 'http://127.0.0.1:5080', timeout: 180000, proxyTimeout: 180000 },
     },
   },
 }))

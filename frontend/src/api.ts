@@ -12,6 +12,7 @@ export type Despesa = {
   status: string
   documento_ref: string | null
   numero_nf: string | null
+  nfe_id: string | null
   nf_confirmada: boolean
   origem_id: string
   origem: string
@@ -64,6 +65,24 @@ export const api = {
   contas: () => get<Conta[]>(`${apiRoot}/contas`),
   plano: () => get<Plano[]>(`${apiRoot}/plano`),
   despesas: (empresa?: string) => get<Despesa[]>(`${apiRoot}/despesas${empresa ? `?empresa=${empresa}` : ''}`),
+  abrirNota: async (id: string) => {
+    const res = await fetch(`${apiRoot}/despesas/${id}/nota`)
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.erro || 'Não abriu a nota')
+    }
+    const url = URL.createObjectURL(await res.blob())
+    window.open(url, '_blank', 'noopener')
+  },
+  abrirBoleto: async (id: string) => {
+    const res = await fetch(`${apiRoot}/despesas/${id}/boleto`)
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.erro || 'Não abriu o boleto')
+    }
+    const url = URL.createObjectURL(await res.blob())
+    window.open(url, '_blank', 'noopener')
+  },
   fornecedores: (q: string) => get<Fornecedor[]>(`${apiRoot}/fornecedores?q=${encodeURIComponent(q)}`),
   criarDespesa: async (body: Record<string, unknown>) => {
     const res = await fetch(`${apiRoot}/despesas`, {
