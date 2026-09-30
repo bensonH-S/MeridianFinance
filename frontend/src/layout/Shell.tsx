@@ -73,7 +73,7 @@ export function Shell() {
   const texto = titulos[pathname]
   const pagina = texto
     ? { title: idioma === 'en' ? texto[1] : texto[0], subtitle: idioma === 'en' ? texto[3] : texto[2] }
-    : { title: 'Meridian Finance', subtitle: '' }
+    : { title: 'Azimut', subtitle: '' }
   const [sessao, setSessao] = useState({ versao: '…', nome: 'Felipe', papel: 'Autoriza' })
 
   useEffect(() => {
@@ -88,7 +88,7 @@ export function Shell() {
       <Box
         component="aside"
         sx={{
-          width: 200,
+          width: 232,
           flexShrink: 0,
           bgcolor: 'var(--ga-sidebar-bg)',
           borderRight: '1px solid',
@@ -98,15 +98,13 @@ export function Shell() {
           height: '100%',
         }}
       >
-        <Box sx={{ px: 1.25, pt: 1.75, pb: 0.5 }}>
-          <Box sx={{ bgcolor: 'var(--ga-logo-plate, #111827)', borderRadius: 1.5, px: 1, py: 0.75 }}>
-            <Box
-              component="img"
-              src={`${import.meta.env.BASE_URL}logo-meridian.png?v=2`}
-              alt="Central GA"
-              sx={{ width: '100%', height: 'auto', display: 'block' }}
-            />
-          </Box>
+        <Box sx={{ px: 1.25, pt: 1.75, pb: 0.75 }}>
+          <Box
+            component="img"
+            src={`${import.meta.env.BASE_URL}logo-azimut.png?v=5`}
+            alt="Azimut"
+            sx={{ width: '100%', height: 'auto', display: 'block' }}
+          />
         </Box>
 
         <Box component="nav" sx={{ flex: 1, px: 1.25, py: 1.75, overflowY: 'auto' }}>
