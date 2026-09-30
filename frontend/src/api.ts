@@ -59,6 +59,29 @@ export type LinhaDda = {
 
 export type Sessao = { versao: string; usuario: { nome: string; papel: string } }
 
+export type LojaVenda = {
+  bk_number: string
+  restaurante: string | null
+  linhas: number
+  quantidade: number
+  venda_bruta: number
+  venda_liquida: number
+}
+
+export type ConfigBkoffice = {
+  usuario: string
+  api: string
+  setor: string
+  senha_definida: boolean
+}
+
+export type ResumoVendas = {
+  dia: string
+  lojas: LojaVenda[]
+  venda_bruta: number
+  ultimo_sync: { mensagem: string; criado_em: string; ok: boolean } | null
+}
+
 export const api = {
   sistema: () => get<Sessao>(`${apiRoot}/sistema`),
   empresas: () => get<Empresa[]>(`${apiRoot}/empresas`),
@@ -109,6 +132,18 @@ export const api = {
     const data = await res.json()
     if (!res.ok) throw new Error(data.erro || 'Não leu a planilha')
     return data as { linhas: LinhaDda[] }
+  },
+  vendas: (dia: string) => get<ResumoVendas>(`${apiRoot}/vendas?dia=${encodeURIComponent(dia)}`),
+  configBkoffice: () => get<ConfigBkoffice>(`${apiRoot}/config/bkoffice`),
+  salvarBkoffice: async (body: { usuario: string; senha: string; api: string; setor: string }) => {
+    const res = await fetch(`${apiRoot}/config/bkoffice`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.erro || 'Não salvou')
+    return data as ConfigBkoffice
   },
   importarDda: async (linhas: LinhaDda[]) => {
     const res = await fetch(`${apiRoot}/dda/importar`, {

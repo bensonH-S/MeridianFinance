@@ -1,9 +1,10 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Shell } from './layout/Shell'
 import { ContasPagarPage } from './pages/ContasPagarPage'
-import { ConfigDetalhePage } from './pages/ConfigPage'
+import { ConfigDetalhePage, ConfigPage } from './pages/ConfigPage'
 import { DdaPage } from './pages/DdaPage'
 import { ModuloPage } from './pages/ModuloPage'
+import { VendasPage } from './pages/VendasPage'
 
 export function App() {
   return (
@@ -15,8 +16,9 @@ export function App() {
           <Route path="caixa" element={<ModuloPage titulo="Fechamento de caixa" />} />
           <Route path="movimento" element={<ModuloPage titulo="Contas movimento" />} />
           <Route path="dre" element={<ModuloPage titulo="DRE" />} />
+          <Route path="vendas" element={<VendasPage />} />
           <Route path="integracoes" element={<DdaPage />} />
-          <Route path="configuracoes" element={<ModuloPage titulo="Configuração" />} />
+          <Route path="configuracoes" element={<ConfigPage />} />
           <Route path="configuracoes/:secao" element={<ConfigDetalhePage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

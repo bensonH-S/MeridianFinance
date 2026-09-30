@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "local": "node scripts/subir-local.mjs"
+    "local": "node scripts/subir-local.mjs",
+    "vendas": "node scripts/sync-vendas-bk.mjs"
   },
   "dependencies": {
     "nfe-danfe-pdf": "^1.0.3",

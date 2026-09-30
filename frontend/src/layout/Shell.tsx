@@ -9,6 +9,7 @@ import PointOfSaleOutlinedIcon from '@mui/icons-material/PointOfSaleOutlined'
 import SwapHorizOutlinedIcon from '@mui/icons-material/SwapHorizOutlined'
 import AssessmentOutlinedIcon from '@mui/icons-material/AssessmentOutlined'
 import HubOutlinedIcon from '@mui/icons-material/HubOutlined'
+import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined'
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined'
 
 const grupos = [
@@ -24,6 +25,7 @@ const grupos = [
   {
     titulo: 'Gestão',
     itens: [
+      { to: '/vendas', label: 'Vendas', icon: <StorefrontOutlinedIcon /> },
       { to: '/dre', label: 'DRE', icon: <AssessmentOutlinedIcon /> },
       { to: '/integracoes', label: 'Integrações', icon: <HubOutlinedIcon /> },
     ],
@@ -42,9 +44,14 @@ const titulos: Record<string, { title: string; subtitle: string }> = {
   '/receber': { title: 'Contas a receber', subtitle: 'Módulo em desenvolvimento.' },
   '/caixa': { title: 'Fechamento de caixa', subtitle: 'Módulo em desenvolvimento.' },
   '/movimento': { title: 'Contas movimento', subtitle: 'Módulo em desenvolvimento.' },
+  '/vendas': {
+    title: 'Vendas',
+    subtitle: 'Entra sozinha, a cada poucos minutos.',
+  },
   '/dre': { title: 'DRE', subtitle: 'Módulo em desenvolvimento.' },
   '/integracoes': { title: 'Integrações', subtitle: 'Boletos do DDA no nome das empresas.' },
-  '/configuracoes': { title: 'Configuração', subtitle: 'Módulo em desenvolvimento.' },
+  '/configuracoes': { title: 'Configuração', subtitle: 'Cadastros e o acesso da API de vendas.' },
+  '/configuracoes/bkoffice': { title: 'BK Office', subtitle: 'Usuário e endereço usados para trazer as vendas.' },
   '/configuracoes/empresas': { title: 'Empresas', subtitle: 'Lojas e holdings.' },
   '/configuracoes/contas': { title: 'Contas bancárias', subtitle: 'Caixa, Banco do Brasil e Itaú.' },
   '/configuracoes/plano': { title: 'Plano de contas', subtitle: 'Classificação do que é a pagar.' },

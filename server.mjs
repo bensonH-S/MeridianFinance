@@ -8,6 +8,7 @@ import { acharFornecedor, classificar, lerPlanilha } from './lib/dda.mjs'
 import { gerarDanfe } from './lib/danfe.mjs'
 import { baixarBoletoDaDespesa, baixarNotaDaDespesa } from './lib/boletoEsupri.mjs'
 import { cruzarNotas } from './lib/nfEntrada.mjs'
+import { hojeBR, lerConfigBkoffice, registrarFalhaVendas, resumoVendas, salvarConfigBkoffice, sincronizarVendasBk } from './lib/bkofficeVendas.mjs'
 
 const root = path.dirname(fileURLToPath(import.meta.url))
 const port = Number(process.env.PORT || 5080)
@@ -62,6 +63,7 @@ const operacional = new pg.Pool({
 const FORMAS = new Set(['dinheiro', 'online', 'boleto', 'guia', 'folha', 'cadastro', 'chave_pix'])
 
 const sessao = { nome: 'Felipe', papel: 'Autoriza' }
+let coletaVendas = null
 
 function versaoApp() {
   if (process.env.APP_VERSION) return process.env.APP_VERSION
@@ -400,6 +402,40 @@ const server = http.createServer(async (req, res) => {
       if (!deleted.rowCount) return send(res, 404, JSON.stringify({ erro: 'Despesa não encontrada.' }))
       return send(res, 200, JSON.stringify(deleted.rows[0]))
     }
+    if (req.method === 'GET' && url.pathname === '/api/config/bkoffice') {
+      const cfg = await lerConfigBkoffice(pool, env)
+      return send(res, 200, JSON.stringify({
+        usuario: cfg.usuario,
+        api: cfg.api,
+        setor: cfg.setor,
+        senha_definida: cfg.senha_definida,
+      }))
+    }
+    if (req.method === 'PUT' && url.pathname === '/api/config/bkoffice') {
+      const body = await readBody(req)
+      try {
+        return send(res, 200, JSON.stringify(await salvarConfigBkoffice(pool, body)))
+      } catch (err) {
+        return send(res, err.status || 400, JSON.stringify({ erro: err.message || 'Não salvou a configuração.' }))
+      }
+    }
+    if (req.method === 'GET' && url.pathname === '/api/vendas') {
+      return send(res, 200, JSON.stringify(await resumoVendas(pool, url.searchParams.get('dia') || '')))
+    }
+    if (req.method === 'POST' && url.pathname === '/api/vendas/sync') {
+      if (coletaVendas) {
+        return send(res, 409, JSON.stringify({ erro: 'Já tem uma coleta de vendas em andamento.' }))
+      }
+      const body = await readBody(req)
+      coletaVendas = sincronizarVendasBk({ pool, env, inicio: body.inicio, fim: body.fim })
+      try {
+        return send(res, 200, JSON.stringify(await coletaVendas))
+      } catch (err) {
+        return send(res, err.status || 502, JSON.stringify({ erro: err.message || 'Não puxou as vendas.' }))
+      } finally {
+        coletaVendas = null
+      }
+    }
     if (req.method === 'POST' && (url.pathname === '/api/dda/previa' || url.pathname === '/api/dda/importar')) {
       const body = await readBody(req)
       const contexto = await contextoDda()
@@ -467,8 +503,31 @@ const server = http.createServer(async (req, res) => {
   }
 })
 
+const intervaloVendas = Number(process.env.VENDAS_SYNC_MS || 180000)
+
+async function cicloVendas() {
+  if (coletaVendas) return
+  const dia = hojeBR()
+  coletaVendas = sincronizarVendasBk({ pool, env, inicio: dia, fim: dia })
+  try {
+    const resultado = await coletaVendas
+    console.log(`[vendas] ${resultado.mensagem}`)
+  } catch (err) {
+    const mensagem = err.message || 'Falha na coleta de vendas'
+    console.error(`[vendas] ${mensagem}`)
+    await registrarFalhaVendas(pool, dia, dia, mensagem).catch((falha) => console.error(falha.message))
+  } finally {
+    coletaVendas = null
+  }
+}
+
 server.listen(port, '127.0.0.1', () => {
   console.log(`meridian-finance http://127.0.0.1:${port}`)
+  if (intervaloVendas >= 60000) {
+    console.log(`[vendas] coleta automática a cada ${Math.round(intervaloVendas / 1000)}s`)
+    setTimeout(cicloVendas, 8000)
+    setInterval(cicloVendas, intervaloVendas)
+  }
   pool.query(`
     alter table despesas add column if not exists dados_pagamento text;
     alter table despesas add column if not exists numero_nf text;

@@ -18,7 +18,9 @@ import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined'
 import LocalShippingOutlinedIcon from '@mui/icons-material/LocalShippingOutlined'
 import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined'
 import PeopleOutlinedIcon from '@mui/icons-material/PeopleOutlined'
-import { api, type Conta, type Empresa, type Fornecedor, type Plano } from '../api'
+import HubOutlinedIcon from '@mui/icons-material/HubOutlined'
+import Alert from '@mui/material/Alert'
+import { api, type ConfigBkoffice, type Conta, type Empresa, type Fornecedor, type Plano } from '../api'
 
 const CARDS = [
   ['empresas', 'Empresas', 'Lojas e holdings. A loja entra com BK.', StorefrontOutlinedIcon],
@@ -27,6 +29,7 @@ const CARDS = [
   ['fornecedores', 'Fornecedores', 'Cadastro financeiro e o plano padrão.', LocalShippingOutlinedIcon],
   ['formas', 'Formas de pagamento', 'Boleto e guia no geral. Folha, cadastro e PIX só no freelancer.', PaymentsOutlinedIcon],
   ['usuarios', 'Usuários', 'Quem prepara e quem autoriza.', PeopleOutlinedIcon],
+  ['bkoffice', 'BK Office', 'Usuário, senha e endereço da API que traz as vendas.', HubOutlinedIcon],
 ] as const
 
 export function ConfigPage() {
@@ -111,6 +114,7 @@ export function ConfigDetalhePage() {
           <Paper variant="outlined" sx={{ p: 2.5 }}><Typography sx={{ fontWeight: 500 }}>Freelancer e treinamento</Typography><Typography variant="body2" color="text.secondary">Folha, cadastro ou chave PIX. O registro da pessoa continua no FreeControl.</Typography></Paper>
         </Box>
       )}
+      {secao === 'bkoffice' && <FormBkoffice />}
       {secao === 'usuarios' && (
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
           <Paper variant="outlined" sx={{ p: 2.5 }}><Typography sx={{ fontWeight: 500 }}>Financeiro</Typography><Typography variant="body2" color="text.secondary">Prepara o lançamento, do rascunho até deixar pronto.</Typography></Paper>
@@ -118,6 +122,61 @@ export function ConfigDetalhePage() {
         </Box>
       )}
     </Stack>
+  )
+}
+
+function FormBkoffice() {
+  const [form, setForm] = useState({ usuario: '', senha: '', api: '', setor: '1005196' })
+  const [senhaDefinida, setSenhaDefinida] = useState(false)
+  const [erro, setErro] = useState('')
+  const [aviso, setAviso] = useState('')
+  const [salvando, setSalvando] = useState(false)
+
+  useEffect(() => {
+    api.configBkoffice().then((cfg: ConfigBkoffice) => {
+      setForm({ usuario: cfg.usuario, senha: '', api: cfg.api, setor: cfg.setor })
+      setSenhaDefinida(cfg.senha_definida)
+    }).catch((err: unknown) => setErro(err instanceof Error ? err.message : 'Não carregou'))
+  }, [])
+
+  const salvar = async () => {
+    setSalvando(true)
+    setErro('')
+    setAviso('')
+    try {
+      const cfg = await api.salvarBkoffice(form)
+      setForm((atual) => ({ ...atual, senha: '', usuario: cfg.usuario, api: cfg.api, setor: cfg.setor }))
+      setSenhaDefinida(cfg.senha_definida)
+      setAviso('Salvo. A próxima coleta usa esse acesso.')
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : 'Não salvou')
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  return (
+    <Paper variant="outlined" sx={{ p: 2.5, maxWidth: 560 }}>
+      <Stack spacing={2}>
+        <TextField label="Usuário" size="small" value={form.usuario} onChange={(ev) => setForm({ ...form, usuario: ev.target.value })} />
+        <TextField
+          label="Senha"
+          type="password"
+          size="small"
+          value={form.senha}
+          placeholder={senhaDefinida ? 'Deixe em branco para manter' : ''}
+          onChange={(ev) => setForm({ ...form, senha: ev.target.value })}
+          helperText={senhaDefinida ? 'Já existe uma senha. Preencha só para trocar.' : 'Senha do portal do BK Office.'}
+        />
+        <TextField label="API" size="small" value={form.api} onChange={(ev) => setForm({ ...form, api: ev.target.value })} />
+        <TextField label="Setor" size="small" value={form.setor} onChange={(ev) => setForm({ ...form, setor: ev.target.value })} />
+        {erro ? <Alert severity="error">{erro}</Alert> : null}
+        {aviso ? <Alert severity="success">{aviso}</Alert> : null}
+        <Button variant="contained" disabled={salvando || !form.usuario} onClick={salvar} sx={{ alignSelf: 'flex-start' }}>
+          {salvando ? 'Salvando…' : 'Salvar'}
+        </Button>
+      </Stack>
+    </Paper>
   )
 }
 
