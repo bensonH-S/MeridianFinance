@@ -1,11 +1,32 @@
 :root {
-  --ga-orange: #ff5a0a;
-  --ga-canvas: #060b10;
-  --ga-surface: #0c141c;
-  --ga-sidebar: #060b10;
-  --ga-sidebar-active-bg: linear-gradient(90deg, rgba(255, 90, 10, 0.2), rgba(255, 90, 10, 0.06));
-  --ga-sidebar-active-text: #ffffff;
-  --ga-sidebar-active-border: #ff5a0a;
+  --ga-navy: #1b2a6b;
+  --ga-primary-btn: #1b2a6b;
+  --ga-navy-dark: #152056;
+  --ga-primary-hover: #152056;
+  --ga-orange: #e8520a;
+  --ga-orange-hover: #cf4909;
+  --ga-orange-light: #fff7f3;
+  --ga-surface: #ffffff;
+  --ga-canvas: #f9fafb;
+  --ga-canvas-alt: #f3f4f6;
+  --ga-picker-paper: #ffffff;
+  --ga-border: #e5e7eb;
+  --ga-border-strong: #d1d5db;
+  --ga-text-primary: #111827;
+  --ga-text-secondary: #6b7280;
+  --ga-text-muted: #9ca3af;
+  --ga-sidebar-bg: #ffffff;
+  --ga-sidebar-border: #e5e7eb;
+  --ga-sidebar-active-bg: rgba(27, 42, 107, 0.08);
+  --ga-sidebar-active-text: #1b2a6b;
+  --ga-sidebar-active-border: #1b2a6b;
+  --ga-sidebar-active-icon: #1b2a6b;
+  --ga-sidebar-hover: #f3f4f6;
+  --ga-sidebar-text: #111827;
+  --ga-sidebar-muted: #6b7280;
+  --ga-success: #059669;
+  --ga-warning: #d97706;
+  --ga-danger: #dc2626;
 }
 
 html,
@@ -15,9 +36,60 @@ body,
   margin: 0;
 }
 
+.tema-pagar {
+  --ga-navy: #1b6ef3;
+  --ga-canvas: #f7f9fc;
+  --ga-canvas-alt: #ffffff;
+  --ga-surface: #ffffff;
+  --ga-border: #e2e8f0;
+  --ga-text-primary: #f8fafc;
+  --ga-text-secondary: #94a3b8;
+  --ga-sidebar-bg: #051017;
+  --ga-sidebar-border: rgba(255, 255, 255, 0.08);
+  --ga-sidebar-active-bg: rgba(27, 110, 243, 0.16);
+  --ga-sidebar-active-text: #ffffff;
+  --ga-sidebar-active-border: #1b6ef3;
+  --ga-sidebar-active-icon: #1b6ef3;
+  --ga-sidebar-hover: rgba(255, 255, 255, 0.06);
+  --ga-sidebar-text: #f8fafc;
+  --ga-sidebar-muted: #94a3b8;
+  --ga-logo-plate: #051017;
+  color-scheme: light;
+}
+
+.tema-escuro {
+  --ga-navy: #1b6ef3;
+  --ga-canvas: #051017;
+  --ga-canvas-alt: #122433;
+  --ga-surface: #0c1822;
+  --ga-border: #1c3040;
+  --ga-text-primary: #f8fafc;
+  --ga-text-secondary: #94a3b8;
+  --ga-sidebar-bg: #051017;
+  --ga-sidebar-border: rgba(255, 255, 255, 0.08);
+  --ga-sidebar-active-bg: rgba(27, 110, 243, 0.18);
+  --ga-sidebar-active-text: #ffffff;
+  --ga-sidebar-active-border: #1b6ef3;
+  --ga-sidebar-active-icon: #60a5fa;
+  --ga-sidebar-hover: rgba(255, 255, 255, 0.06);
+  --ga-sidebar-text: #f8fafc;
+  --ga-sidebar-muted: #94a3b8;
+  --ga-logo-plate: #051017;
+  color-scheme: dark;
+}
+
+html[data-tema='escuro'] {
+  --ga-canvas-alt: #122433;
+}
+
+html[data-tema='escuro'] body {
+  background: #051017;
+  color: #f8fafc;
+}
+
 body {
-  background: #060b10;
-  color: #f5f7fa;
+  background: var(--ga-canvas);
+  color: var(--ga-text-primary);
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-weight: 400;
   -webkit-font-smoothing: antialiased;

@@ -140,6 +140,23 @@ export type AcessoBb = {
   ultima_mensagem: string | null
 }
 
+export type AcessoItau = {
+  host: string
+  porta: number
+  usuario: string
+  senha_definida: boolean
+  chave_definida: boolean
+  frase_definida: boolean
+  produto: string
+  pasta: string
+  ativo: boolean
+  pronta: boolean
+  servidor: boolean
+  ultima_coleta: string | null
+  ultimo_ok: boolean | null
+  ultima_mensagem: string
+}
+
 export type ConfigBkoffice = {
   usuario: string
   api: string
@@ -254,6 +271,21 @@ export const api = {
     const data = await res.json()
     if (!res.ok) throw new Error(data.erro || 'Não salvou')
     return data as ConfigBkoffice
+  },
+  acessoItau: () => get<AcessoItau>(`${apiRoot}/config/itau`),
+  salvarItau: async (body: Record<string, unknown>) => {
+    const res = await fetch(`${apiRoot}/config/itau`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.erro || 'Não salvou')
+    return data as AcessoItau
+  },
+  coletarItau: async () => {
+    const res = await fetch(`${apiRoot}/config/itau/coletar`, { method: 'POST' })
+    if (!res.ok) throw new Error('Não iniciou a coleta')
   },
   acessosBb: () => get<AcessoBb[]>(`${apiRoot}/config/bb`),
   salvarAcessoBb: async (empresaId: string, body: Record<string, unknown>) => {

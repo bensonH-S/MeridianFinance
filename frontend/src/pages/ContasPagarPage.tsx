@@ -29,15 +29,16 @@ import AttachFileOutlinedIcon from '@mui/icons-material/AttachFileOutlined'
 import CheckIcon from '@mui/icons-material/Check'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import { api, brl, type Despesa, type Empresa, type Fornecedor } from '../api'
+import { usePrefs } from '../prefs'
 
 function situacao(e: Despesa) {
-  if (e.status === 'conciliada') return { label: 'Conciliada', tom: 'conciliada' }
-  if (e.status === 'paga') return { label: 'Paga', tom: 'paga' }
-  if (e.status === 'enviada') return { label: 'Enviada', tom: 'enviada' }
-  if (e.status === 'autorizada') return { label: 'Autorizada', tom: 'autorizada' }
-  if (e.status === 'pronta') return { label: 'Para autorizar', tom: 'pronta' }
-  if (e.status === 'bloqueada_duplicata') return { label: 'Duplicata', tom: 'bloqueada_duplicata' }
-  return { label: 'A pagar', tom: 'a_pagar' }
+  if (e.status === 'conciliada') return 'conciliada'
+  if (e.status === 'paga') return 'paga'
+  if (e.status === 'enviada') return 'enviada'
+  if (e.status === 'autorizada') return 'autorizada'
+  if (e.status === 'pronta') return 'pronta'
+  if (e.status === 'bloqueada_duplicata') return 'bloqueada_duplicata'
+  return 'a_pagar'
 }
 const CODIGO: Record<string, string> = {
   folha: 'Folha', cadastro: 'Cadastro', chave_pix: 'Chave PIX',
@@ -45,16 +46,39 @@ const CODIGO: Record<string, string> = {
 }
 const FILTROS = ['Todas', 'Para autorizar', 'Vencidas', 'NF confirmada'] as const
 
-const TOM_STATUS: Record<string, { color: string; border: string; bg: string }> = {
-  rascunho: { color: '#C5D0D8', border: '#3A4C5A', bg: 'transparent' },
-  classificada: { color: '#B7E4C7', border: '#1F8A4C', bg: 'rgba(31,138,76,0.16)' },
-  pronta: { color: '#FFD7C2', border: '#C45A28', bg: 'rgba(255,90,10,0.12)' },
-  autorizada: { color: '#C5D4E0', border: '#3D5A73', bg: 'transparent' },
-  enviada: { color: '#C5D4E0', border: '#3D5A73', bg: 'transparent' },
-  paga: { color: '#9DCFB3', border: '#1F6B3A', bg: 'transparent' },
-  conciliada: { color: '#9DCFB3', border: '#1F6B3A', bg: 'transparent' },
-  bloqueada_duplicata: { color: '#FFB4B4', border: '#E23B3B', bg: 'rgba(226,59,59,0.14)' },
-  a_pagar: { color: '#C5D0D8', border: '#3A4C5A', bg: 'transparent' },
+const TOM_CLARO: Record<string, { color: string; border: string; bg: string }> = {
+  rascunho: { color: '#64748B', border: '#E2E8F0', bg: 'transparent' },
+  classificada: { color: '#0D4ECC', border: 'rgba(27,110,243,0.35)', bg: 'rgba(27,110,243,0.08)' },
+  pronta: { color: '#1D4ED8', border: 'rgba(59,130,246,0.45)', bg: 'rgba(59,130,246,0.1)' },
+  autorizada: { color: '#1D4ED8', border: 'rgba(59,130,246,0.45)', bg: 'rgba(59,130,246,0.1)' },
+  enviada: { color: '#1D4ED8', border: 'rgba(59,130,246,0.45)', bg: 'rgba(59,130,246,0.1)' },
+  paga: { color: '#047857', border: 'rgba(16,185,129,0.45)', bg: 'rgba(16,185,129,0.12)' },
+  conciliada: { color: '#047857', border: 'rgba(16,185,129,0.45)', bg: 'rgba(16,185,129,0.12)' },
+  bloqueada_duplicata: { color: '#B91C1C', border: 'rgba(239,68,68,0.45)', bg: 'rgba(239,68,68,0.08)' },
+  a_pagar: { color: '#B45309', border: 'rgba(245,158,11,0.5)', bg: 'rgba(245,158,11,0.12)' },
+}
+
+const TOM_ESCURO: Record<string, { color: string; border: string; bg: string }> = {
+  rascunho: { color: '#94A3B8', border: '#1C3040', bg: 'transparent' },
+  classificada: { color: '#93C5FD', border: 'rgba(27,110,243,0.45)', bg: 'rgba(27,110,243,0.16)' },
+  pronta: { color: '#93C5FD', border: 'rgba(96,165,250,0.5)', bg: 'rgba(96,165,250,0.14)' },
+  autorizada: { color: '#93C5FD', border: 'rgba(96,165,250,0.5)', bg: 'rgba(96,165,250,0.14)' },
+  enviada: { color: '#93C5FD', border: 'rgba(96,165,250,0.5)', bg: 'rgba(96,165,250,0.14)' },
+  paga: { color: '#6EE7B7', border: 'rgba(52,211,153,0.45)', bg: 'rgba(52,211,153,0.14)' },
+  conciliada: { color: '#6EE7B7', border: 'rgba(52,211,153,0.45)', bg: 'rgba(52,211,153,0.14)' },
+  bloqueada_duplicata: { color: '#FCA5A5', border: 'rgba(248,113,113,0.5)', bg: 'rgba(248,113,113,0.12)' },
+  a_pagar: { color: '#FCD34D', border: 'rgba(251,191,36,0.5)', bg: 'rgba(251,191,36,0.12)' },
+}
+
+const ROTULO: Record<string, [string, string]> = {
+  conciliada: ['Conciliada', 'Reconciled'],
+  paga: ['Paga', 'Paid'],
+  enviada: ['Enviada', 'Sent'],
+  autorizada: ['Autorizada', 'Authorized'],
+  pronta: ['Para autorizar', 'To authorize'],
+  bloqueada_duplicata: ['Duplicata', 'Duplicate'],
+  a_pagar: ['A pagar', 'To pay'],
+  rascunho: ['Rascunho', 'Draft'],
 }
 
 const aberta = (e: Despesa) => !['paga', 'conciliada', 'cancelada'].includes(e.status)
@@ -77,6 +101,8 @@ function periodoAtual() {
 
 export function ContasPagarPage() {
   const navigate = useNavigate()
+  const { t, modo, idioma } = usePrefs()
+  const escuro = modo === 'escuro'
   const [empresas, setEmpresas] = useState<Empresa[]>([])
   const [despesas, setDespesas] = useState<Despesa[]>([])
   const [loja, setLoja] = useState('')
@@ -128,43 +154,47 @@ export function ContasPagarPage() {
   return (
     <Stack spacing={2} sx={{ height: '100%', minHeight: 0 }}>
       <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} sx={{ alignItems: { md: 'center' } }}>
-        <TextField size="small" placeholder="Buscar lançamento" value={busca} onChange={(ev) => setBusca(ev.target.value)} sx={{ minWidth: 280, bgcolor: 'background.paper' }} />
-        <TextField size="small" label="De" type="date" value={de} onChange={(ev) => setDe(ev.target.value)} slotProps={{ inputLabel: { shrink: true } }} sx={{ width: 150, bgcolor: 'background.paper' }} />
-        <TextField size="small" label="Até" type="date" value={ate} onChange={(ev) => setAte(ev.target.value)} slotProps={{ inputLabel: { shrink: true } }} sx={{ width: 150, bgcolor: 'background.paper' }} />
+        <TextField size="small" placeholder={t('Buscar lançamento', 'Search entry')} value={busca} onChange={(ev) => setBusca(ev.target.value)} sx={{ minWidth: 280, bgcolor: 'background.paper' }} />
+        <TextField size="small" label={t('De', 'From')} type="date" value={de} onChange={(ev) => setDe(ev.target.value)} slotProps={{ inputLabel: { shrink: true } }} sx={{ width: 150, bgcolor: 'background.paper' }} />
+        <TextField size="small" label={t('Até', 'To')} type="date" value={ate} onChange={(ev) => setAte(ev.target.value)} slotProps={{ inputLabel: { shrink: true } }} sx={{ width: 150, bgcolor: 'background.paper' }} />
         <TextField
           select
           size="small"
-          label="Loja"
+          label={t('Loja', 'Store')}
           value={loja}
           onChange={(ev) => { setLoja(ev.target.value); carregar(ev.target.value) }}
-          sx={{ minWidth: 200, bgcolor: 'background.paper', '& .MuiOutlinedInput-notchedOutline': { borderColor: loja ? '#FF5A0A' : undefined } }}
+          sx={{ minWidth: 200, bgcolor: 'background.paper', '& .MuiOutlinedInput-notchedOutline': { borderColor: loja ? 'primary.main' : undefined } }}
         >
-          <MenuItem value="">Todas as lojas</MenuItem>
+          <MenuItem value="">{t('Todas as lojas', 'All stores')}</MenuItem>
           {lojas.map((e) => <MenuItem key={e.id} value={e.id}>{e.apelido}</MenuItem>)}
         </TextField>
         <Box sx={{ flex: 1 }} />
-        <Button variant="outlined" onClick={() => navigate('/integracoes')}>Importar DDA</Button>
-        <Button variant="contained" color="secondary" startIcon={<AddIcon />} onClick={() => setAberto(true)}>Nova despesa</Button>
+        <Button variant="outlined" onClick={() => navigate('/integracoes')}>{t('Importar DDA', 'Import DDA')}</Button>
+        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setAberto(true)}>{t('Nova despesa', 'New expense')}</Button>
       </Stack>
 
       <Stack direction="row" spacing={1.5} sx={{ flexWrap: 'wrap' }}>
-        <Resumo rotulo="A pagar" valor={brl(soma(aberta))} detalhe={`${noPeriodo.filter(aberta).length} em aberto`} />
-        <Resumo rotulo="Pago" valor={brl(soma((e) => e.status === 'paga' || e.status === 'conciliada'))} detalhe="já baixadas" />
-        <Resumo rotulo="Para autorizar" valor={brl(soma((e) => e.status === 'pronta'))} detalhe="aguardando o Felipe" />
-        <Resumo rotulo="Vencida" valor={brl(vencida)} detalhe="sem pagar" alerta={vencida > 0} />
+        <Resumo rotulo={t('A pagar', 'To pay')} valor={brl(soma(aberta))} detalhe={t(`${noPeriodo.filter(aberta).length} em aberto`, `${noPeriodo.filter(aberta).length} open`)} />
+        <Resumo rotulo={t('Pago', 'Paid')} valor={brl(soma((e) => e.status === 'paga' || e.status === 'conciliada'))} detalhe={t('já baixadas', 'already settled')} />
+        <Resumo rotulo={t('Para autorizar', 'To authorize')} valor={brl(soma((e) => e.status === 'pronta'))} detalhe={t('aguardando o Felipe', 'waiting for Felipe')} />
+        <Resumo rotulo={t('Vencida', 'Overdue')} valor={brl(vencida)} detalhe={t('sem pagar', 'unpaid')} alerta={vencida > 0} />
       </Stack>
 
       <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
         {FILTROS.map((item) => (
           <Chip
             key={item}
-            label={CODIGO[item] || item}
+            label={t(
+              item === 'Todas' ? 'Todas' : item === 'Para autorizar' ? 'Para autorizar' : item === 'Vencidas' ? 'Vencidas' : 'NF confirmada',
+              item === 'Todas' ? 'All' : item === 'Para autorizar' ? 'To authorize' : item === 'Vencidas' ? 'Overdue' : 'Invoice confirmed',
+            )}
             variant="outlined"
             onClick={() => { setFiltro(item); setPagina(0) }}
             sx={{
-              bgcolor: filtro === item ? 'rgba(255, 90, 10, 0.12)' : '#0D161F',
-              borderColor: filtro === item ? '#FF5A0A' : '#1C2A35',
-              color: filtro === item ? '#fff' : '#C2CDD5',
+              bgcolor: filtro === item ? (escuro ? 'rgba(27, 110, 243, 0.2)' : 'rgba(27, 110, 243, 0.1)') : 'background.paper',
+              borderColor: filtro === item ? 'primary.main' : 'divider',
+              color: filtro === item ? (escuro ? '#93C5FD' : '#0D4ECC') : 'text.secondary',
+              fontWeight: filtro === item ? 600 : 500,
             }}
           />
         ))}
@@ -175,34 +205,38 @@ export function ContasPagarPage() {
         <Table size="small" stickyHeader>
           <TableHead>
             <TableRow>
-              {['Status', 'Descrição', 'Origem', 'Nota fiscal', 'Forma de pagamento', 'Código', 'Vencimento', 'Valor', ''].map((h) => (
-                <TableCell key={h || 'acao'} align={h === 'Valor' ? 'right' : h === 'Nota fiscal' ? 'center' : 'left'} sx={h === 'Nota fiscal' ? { width: 88 } : undefined}>{h}</TableCell>
+              {[
+                t('Status', 'Status'), t('Descrição', 'Description'), t('Origem', 'Source'), t('Nota fiscal', 'Invoice'),
+                t('Forma de pagamento', 'Payment method'), t('Código', 'Code'), t('Vencimento', 'Due date'), t('Valor', 'Amount'), '',
+              ].map((h, indice) => (
+                <TableCell key={h || 'acao'} align={indice === 7 ? 'right' : indice === 3 ? 'center' : 'left'} sx={indice === 3 ? { width: 88 } : undefined}>{h}</TableCell>
               ))}
             </TableRow>
           </TableHead>
           <TableBody>
             {linhas.length === 0 && (
-              <TableRow><TableCell colSpan={9} sx={{ color: 'text.secondary', py: 4 }}>Nenhuma despesa nesse filtro.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} sx={{ color: 'text.secondary', py: 4 }}>{t('Nenhuma despesa nesse filtro.', 'No expenses in this filter.')}</TableCell></TableRow>
             )}
             {visiveis.map((e) => {
-              const estado = situacao(e)
-              const tom = TOM_STATUS[estado.tom] || TOM_STATUS.a_pagar
+              const tomChave = situacao(e)
+              const tom = (escuro ? TOM_ESCURO : TOM_CLARO)[tomChave] || (escuro ? TOM_ESCURO : TOM_CLARO).a_pagar
+              const rotulo = ROTULO[tomChave] || ROTULO.a_pagar
               return (
               <TableRow key={e.id} hover>
                 <TableCell>
-                  <Chip size="small" label={estado.label} variant="outlined" sx={{ height: 22, fontWeight: 500, color: tom.color, borderColor: tom.border, bgcolor: tom.bg }} />
+                  <Chip size="small" label={idioma === 'en' ? rotulo[1] : rotulo[0]} variant="outlined" sx={{ height: 22, fontWeight: 500, color: tom.color, borderColor: tom.border, bgcolor: tom.bg }} />
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{e.descricao.trim() || 'Sem descrição'}</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{e.descricao.trim() || t('Sem descrição', 'No description')}</Typography>
                 </TableCell>
                 <TableCell>{e.origem}</TableCell>
                 <TableCell align="center" sx={{ verticalAlign: 'middle', width: 88, px: 0 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 24 }}>
                     {e.nf_confirmada
-                      ? <Chip size="small" icon={<CheckIcon />} label="NF confirmada" sx={{ bgcolor: '#1F8A4C', color: '#fff', fontWeight: 600, '& .MuiChip-icon': { color: '#fff' } }} />
+                      ? <Chip size="small" icon={<CheckIcon />} label={t('NF confirmada', 'Invoice confirmed')} sx={{ bgcolor: escuro ? 'rgba(52,211,153,0.14)' : 'rgba(16,185,129,0.12)', color: escuro ? '#6EE7B7' : '#047857', fontWeight: 600, '& .MuiChip-icon': { color: escuro ? '#6EE7B7' : '#047857' } }} />
                       : (
-                        <Tooltip title="NF pendente">
-                          <AttachFileOutlinedIcon aria-label="NF pendente" sx={{ fontSize: 18, color: '#9AABBA', display: 'block' }} />
+                        <Tooltip title={t('NF pendente', 'Invoice pending')}>
+                          <AttachFileOutlinedIcon aria-label="NF pendente" sx={{ fontSize: 18, color: 'text.disabled', display: 'block' }} />
                         </Tooltip>
                       )}
                   </Box>
@@ -214,8 +248,8 @@ export function ContasPagarPage() {
                 </TableCell>
                 <TableCell align="right" sx={{ fontWeight: 600, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>{brl(Number(e.valor))}</TableCell>
                 <TableCell align="right">
-                  <Button size="small" onClick={() => setEditando(e)} sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main', bgcolor: 'transparent' } }}>Abrir</Button>
-                  <Button size="small" onClick={() => { setErroExcluir(''); setExcluir(e) }} sx={{ color: 'text.secondary', '&:hover': { color: 'error.main', bgcolor: 'transparent' } }}>Excluir</Button>
+                  <Button size="small" onClick={() => setEditando(e)} sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main', bgcolor: 'transparent' } }}>{t('Abrir', 'Open')}</Button>
+                  <Button size="small" onClick={() => { setErroExcluir(''); setExcluir(e) }} sx={{ color: 'text.secondary', '&:hover': { color: 'error.main', bgcolor: 'transparent' } }}>{t('Excluir', 'Delete')}</Button>
                 </TableCell>
               </TableRow>
               )
@@ -231,20 +265,30 @@ export function ContasPagarPage() {
           rowsPerPage={porPagina}
           onRowsPerPageChange={(ev) => { setPorPagina(Number(ev.target.value)); setPagina(0) }}
           rowsPerPageOptions={[20, 50, 100]}
-          labelRowsPerPage="Por página"
-          labelDisplayedRows={({ from, to, count }) => `${from}–${to} de ${count}`}
-          sx={{ flexShrink: 0, borderTop: '1px solid #1C2A35', bgcolor: '#101820' }}
+          labelRowsPerPage={t('Por página', 'Per page')}
+          labelDisplayedRows={({ from, to, count }) => t(`${from}–${to} de ${count}`, `${from}–${to} of ${count}`)}
+          sx={{
+            flexShrink: 0,
+            borderTop: '1px solid',
+            borderColor: 'divider',
+            bgcolor: 'background.paper',
+            '& .MuiTablePagination-toolbar': { minHeight: 32, height: 32, pl: 1.5, pr: 0.5 },
+            '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': { fontSize: 12, m: 0 },
+            '& .MuiTablePagination-select': { fontSize: 12 },
+            '& .MuiTablePagination-actions': { ml: 0.5 },
+            '& .MuiTablePagination-actions .MuiIconButton-root': { p: 0.25 },
+          }}
         />
       </Paper>
 
       <Dialog open={!!excluir} onClose={() => { if (!excluindo) setExcluir(null) }}>
-        <DialogTitle>Deseja excluir?</DialogTitle>
+        <DialogTitle>{t('Deseja excluir?', 'Delete this expense?')}</DialogTitle>
         <DialogContent>
           <Typography variant="body2">{excluir?.descricao}</Typography>
           {erroExcluir && <Typography color="error" variant="body2" sx={{ mt: 1 }}>{erroExcluir}</Typography>}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setExcluir(null)} disabled={excluindo}>Cancelar</Button>
+          <Button onClick={() => setExcluir(null)} disabled={excluindo}>{t('Cancelar', 'Cancel')}</Button>
           <Button
             color="error"
             variant="contained"
@@ -256,7 +300,7 @@ export function ContasPagarPage() {
                 await api.excluirDespesa(excluir.id)
                 setExcluir(null)
                 carregar()
-                setAviso('Despesa excluída.')
+                setAviso(t('Despesa excluída.', 'Expense deleted.'))
               } catch (err) {
                 setErroExcluir(err instanceof Error ? err.message : 'Não excluiu')
               } finally {
@@ -264,7 +308,7 @@ export function ContasPagarPage() {
               }
             }}
           >
-            Excluir
+            {excluindo ? t('Excluindo…', 'Deleting…') : t('Excluir', 'Delete')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -277,7 +321,7 @@ export function ContasPagarPage() {
         onSalvou={(mensagem) => { setAberto(false); setEditando(null); carregar(); setAviso(mensagem) }}
       />
       <Snackbar open={!!aviso} autoHideDuration={3200} onClose={() => setAviso('')} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
-        <Alert severity="success" variant="filled" onClose={() => setAviso('')} sx={{ bgcolor: '#1F8A4C' }}>{aviso}</Alert>
+        <Alert severity="success" variant="filled" onClose={() => setAviso('')}>{aviso}</Alert>
       </Snackbar>
     </Stack>
   )
@@ -312,20 +356,20 @@ function Resumo({ rotulo, valor, detalhe, alerta = false }: { rotulo: string; va
         minWidth: 180,
         flex: 1,
         ...(alerta ? {
-          borderColor: '#E23B3B',
-          bgcolor: 'rgba(226,59,59,0.08)',
+          borderColor: '#EF4444',
+          bgcolor: 'rgba(239,68,68,0.06)',
           animation: 'vencida-pulso 2.6s ease-in-out infinite',
           '@keyframes vencida-pulso': {
-            '0%, 100%': { boxShadow: '0 0 0 0 rgba(226,59,59,0)' },
-            '50%': { boxShadow: '0 0 0 3px rgba(226,59,59,0.35)' },
+            '0%, 100%': { boxShadow: '0 0 0 0 rgba(239,68,68,0)' },
+            '50%': { boxShadow: '0 0 0 3px rgba(239,68,68,0.18)' },
           },
           '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
         } : {}),
       }}
     >
-      <Typography sx={{ fontSize: 14, fontWeight: 500, color: alerta ? '#FFB4B4' : 'text.secondary' }}>{rotulo}</Typography>
-      <Typography sx={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums', lineHeight: 1.2, color: alerta ? '#FFD6D6' : 'inherit' }}>{valor}</Typography>
-      <Typography sx={{ fontSize: 14, fontWeight: 400, color: alerta ? '#E8A0A0' : 'text.secondary' }}>{detalhe}</Typography>
+      <Typography sx={{ fontSize: 14, fontWeight: 500, color: alerta ? 'error.main' : 'text.secondary' }}>{rotulo}</Typography>
+      <Typography sx={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums', lineHeight: 1.2, color: alerta ? 'error.main' : 'inherit' }}>{valor}</Typography>
+      <Typography sx={{ fontSize: 14, fontWeight: 400, color: alerta ? 'error.main' : 'text.secondary' }}>{detalhe}</Typography>
     </Paper>
   )
 }
@@ -354,6 +398,7 @@ function DespesaForm({ aberto, inicial, empresas, onFechar, onSalvou }: {
   onFechar: () => void
   onSalvou: (mensagem: string) => void
 }) {
+  const { t } = usePrefs()
   const lojas = empresas.filter((e) => e.tipo === 'loja')
   const [descricao, setDescricao] = useState('')
   const [valor, setValor] = useState('')
@@ -428,7 +473,7 @@ function DespesaForm({ aberto, inicial, empresas, onFechar, onSalvou }: {
       }
       if (inicial) await api.atualizarDespesa(inicial.id, corpo)
       else await api.criarDespesa(corpo)
-      onSalvou(inicial ? 'Despesa atualizada.' : 'Despesa cadastrada.')
+      onSalvou(inicial ? t('Despesa atualizada.', 'Expense updated.') : t('Despesa cadastrada.', 'Expense created.'))
     } catch (err) {
       setErro(err instanceof Error ? err.message : 'Não salvou')
     }
@@ -437,18 +482,18 @@ function DespesaForm({ aberto, inicial, empresas, onFechar, onSalvou }: {
   return (
     <Drawer anchor="right" open={aberto} onClose={onFechar} slotProps={{ paper: { sx: { width: 420 } } }}>
       <Stack spacing={1.5} sx={{ p: 3, overflow: 'auto' }}>
-        <Typography variant="h6">{inicial ? 'Editar despesa' : 'Nova despesa'}</Typography>
-          <TextField label="Descrição" size="small" value={descricao} onChange={(ev) => setDescricao(ev.target.value)} />
+        <Typography variant="h6">{inicial ? t('Editar despesa', 'Edit expense') : t('Nova despesa', 'New expense')}</Typography>
+          <TextField label={t('Descrição', 'Description')} size="small" value={descricao} onChange={(ev) => setDescricao(ev.target.value)} />
           <TextField
-            label="Valor"
+            label={t('Valor', 'Amount')}
             size="small"
             value={valor}
             placeholder="R$ 0,00"
             onChange={(ev) => setValor(aoDigitarValor(ev.target.value))}
             onBlur={() => setValor((atual) => atual && Number.isFinite(parseMoeda(atual)) ? brl(parseMoeda(atual)) : '')}
           />
-          <TextField label="Vencimento" size="small" type="date" value={vencimento} onChange={(ev) => setVencimento(ev.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
-          <TextField label="Documento" size="small" value={documento} onChange={(ev) => setDocumento(ev.target.value)} />
+          <TextField label={t('Vencimento', 'Due date')} size="small" type="date" value={vencimento} onChange={(ev) => setVencimento(ev.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
+          <TextField label={t('Documento', 'Document')} size="small" value={documento} onChange={(ev) => setDocumento(ev.target.value)} />
           <Autocomplete
             size="small"
             options={lojas}
@@ -456,7 +501,7 @@ function DespesaForm({ aberto, inicial, empresas, onFechar, onSalvou }: {
             value={lojas.find((e) => e.id === origem) || null}
             onChange={(_, item) => setOrigem(item?.id || '')}
             slotProps={lista}
-            renderInput={(params) => <TextField {...params} label="Loja" />}
+            renderInput={(params) => <TextField {...params} label={t('Loja', 'Store')} />}
           />
           <Autocomplete
             size="small"
@@ -468,22 +513,22 @@ function DespesaForm({ aberto, inicial, empresas, onFechar, onSalvou }: {
             onInputChange={(_, texto, motivo) => { if (motivo === 'input') buscar(texto) }}
             onChange={(_, item) => escolherFornecedor(item)}
             slotProps={lista}
-            renderInput={(params) => <TextField {...params} label="Fornecedor" placeholder="Buscar" />}
+            renderInput={(params) => <TextField {...params} label={t('Fornecedor', 'Supplier')} placeholder={t('Buscar', 'Search')} />}
             renderOption={(props, item) => (
               <li {...props} key={item.id}>{item.nome}{item.plano ? ` · ${item.plano}` : ''}</li>
             )}
           />
-          {fornecedor?.plano && <Typography variant="body2" color="text.secondary">Plano de contas: {fornecedor.plano}</Typography>}
-          <TextField select label="Forma de pagamento" size="small" value={forma} onChange={(ev) => setForma(ev.target.value)}>
+          {fornecedor?.plano && <Typography variant="body2" color="text.secondary">{t('Plano de contas', 'Account')}: {fornecedor.plano}</Typography>}
+          <TextField select label={t('Forma de pagamento', 'Payment method')} size="small" value={forma} onChange={(ev) => setForma(ev.target.value)}>
             {Object.entries(CODIGO).map(([id, nome]) => <MenuItem key={id} value={id}>{nome}</MenuItem>)}
           </TextField>
           {pedeCodigo && (
             <TextField
-              label={forma === 'boleto' ? 'Código de barras do boleto' : 'Chave PIX'}
+              label={forma === 'boleto' ? t('Código de barras do boleto', 'Boleto barcode') : t('Chave PIX', 'PIX key')}
               size="small"
               value={pagamento}
               onChange={(ev) => setPagamento(ev.target.value)}
-              placeholder="Para copiar na hora de pagar"
+              placeholder={t('Para copiar na hora de pagar', 'Copy this when paying')}
             />
           )}
           <Stack direction="row" spacing={1}>
@@ -499,7 +544,7 @@ function DespesaForm({ aberto, inicial, empresas, onFechar, onSalvou }: {
                 finally { setAbrindoNota(false) }
               }}
             >
-              {abrindoNota ? 'Abrindo nota…' : 'Ver nota fiscal'}
+              {abrindoNota ? t('Abrindo nota…', 'Opening invoice…') : t('Ver nota fiscal', 'View invoice')}
             </Button>
             <Button
               variant="outlined"
@@ -513,13 +558,13 @@ function DespesaForm({ aberto, inicial, empresas, onFechar, onSalvou }: {
                 finally { setAbrindoBoleto(false) }
               }}
             >
-              {abrindoBoleto ? 'Abrindo boleto…' : 'Ver boleto'}
+              {abrindoBoleto ? t('Abrindo boleto…', 'Opening boleto…') : t('Ver boleto', 'View boleto')}
             </Button>
           </Stack>
           {erro && <Typography color="error" variant="body2">{erro}</Typography>}
         <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end', pt: 1 }}>
-          <Button onClick={onFechar}>Cancelar</Button>
-          <Button variant="contained" color="secondary" onClick={salvar}>{inicial ? 'Salvar' : 'Criar rascunho'}</Button>
+          <Button onClick={onFechar}>{t('Cancelar', 'Cancel')}</Button>
+          <Button variant="contained" onClick={salvar}>{inicial ? t('Salvar', 'Save') : t('Criar rascunho', 'Create draft')}</Button>
         </Stack>
       </Stack>
     </Drawer>

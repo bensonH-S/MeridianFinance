@@ -25,6 +25,8 @@ import {
   Aviso, Barra, Erro, FiltroSituacao, mensagem, PainelLateral, porSituacao, quando, Resumo, Resumos, Secao, Selo, TabelaConfig, Titulo,
   useBusca, type Coluna, type Situacao,
 } from '../components/ConfigUi'
+import { usePrefs } from '../prefs'
+import { AcessoItauPage } from './AcessoItau'
 import { AcessosBb } from './AcessosBb'
 import { Contas, Empresas, Fornecedores, POR_PAGINA } from './Cadastros'
 
@@ -36,13 +38,32 @@ const CARDS = [
   ['formas', 'Formas de pagamento', 'Boleto e guia no geral. Folha, cadastro e PIX só no freelancer.', PaymentsOutlinedIcon],
   ['usuarios', 'Usuários', 'Quem prepara e quem autoriza.', PeopleOutlinedIcon],
   ['bkoffice', 'BK Office', 'Usuário, senha e endereço da API que traz as vendas.', HubOutlinedIcon],
+  ['itau', 'Itaú', 'Caixa postal da VAN para o retorno de DDA.', AccountBalanceOutlinedIcon],
   ['bb', 'Banco do Brasil', 'Acesso da API de DDA, um por empresa.', AccountBalanceOutlinedIcon],
 ] as const
 
+const CARDS_EN: Record<string, [string, string]> = {
+  empresas: ['Companies', 'Stores and holdings. A store comes in with BK.'],
+  contas: ['Bank accounts', 'Cash, Banco do Brasil and Itaú, with the record name.'],
+  plano: ['Chart of accounts', 'How payables are classified.'],
+  fornecedores: ['Suppliers', 'Financial record and default account.'],
+  formas: ['Payment methods', 'Boleto and tax slip in general. Payroll, record and PIX only for freelancers.'],
+  usuarios: ['Users', 'Who prepares and who authorizes.'],
+  bkoffice: ['BK Office', 'User, password and API address that brings sales.'],
+  itau: ['Itaú', 'VAN mailbox for the DDA return file.'],
+  bb: ['Banco do Brasil', 'DDA API access, one per company.'],
+}
+
 export function ConfigPage() {
+  const { idioma } = usePrefs()
   return (
     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr 1fr' }, gap: 1.5 }}>
       {CARDS.map(([id, titulo, texto, Icon]) => (
+        (() => {
+          const en = CARDS_EN[id]
+          const nome = idioma === 'en' ? en[0] : titulo
+          const detalhe = idioma === 'en' ? en[1] : texto
+          return (
         <Paper
           key={id}
           component={Link}
@@ -63,10 +84,12 @@ export function ConfigPage() {
             <Icon fontSize="small" />
           </Box>
           <Box>
-            <Typography sx={{ fontSize: 14, fontWeight: 500, mb: 0.25 }}>{titulo}</Typography>
-            <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>{texto}</Typography>
+            <Typography sx={{ fontSize: 14, fontWeight: 500, mb: 0.25 }}>{nome}</Typography>
+            <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>{detalhe}</Typography>
           </Box>
         </Paper>
+          )
+        })()
       ))}
     </Box>
   )
@@ -75,10 +98,11 @@ export function ConfigPage() {
 export function ConfigDetalhePage() {
   const { secao = '' } = useParams()
   const navigate = useNavigate()
+  const { t } = usePrefs()
 
   return (
     <Stack spacing={2} sx={{ height: '100%', minHeight: 0, overflow: 'auto', pb: 2 }}>
-      <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/configuracoes')} sx={{ alignSelf: 'flex-start' }}>Voltar</Button>
+      <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/configuracoes')} sx={{ alignSelf: 'flex-start' }}>{t('Voltar', 'Back')}</Button>
       {secao === 'empresas' && <Empresas />}
       {secao === 'contas' && <Contas />}
       {secao === 'plano' && <PlanoContas />}
@@ -86,6 +110,7 @@ export function ConfigDetalhePage() {
       {secao === 'formas' && <Formas />}
       {secao === 'usuarios' && <Usuarios />}
       {secao === 'bkoffice' && <BkOffice />}
+      {secao === 'itau' && <AcessoItauPage />}
       {secao === 'bb' && <AcessosBb />}
     </Stack>
   )
@@ -338,7 +363,7 @@ function BkOffice() {
       render: () => (sync ? (
         <>
           <Typography sx={{ fontSize: 13 }}>{quando(sync.criado_em)}</Typography>
-          <Typography sx={{ fontSize: 12, color: sync.ok ? 'text.secondary' : '#FFB4B4', maxWidth: 280 }} noWrap title={sync.mensagem}>{sync.mensagem}</Typography>
+          <Typography sx={{ fontSize: 12, color: sync.ok ? 'text.secondary' : 'error.main', maxWidth: 280 }} noWrap title={sync.mensagem}>{sync.mensagem}</Typography>
         </>
       ) : '—'),
     },
@@ -362,7 +387,7 @@ function BkOffice() {
         />
       ) : null}
       <Snackbar open={!!aviso} autoHideDuration={3600} onClose={() => setAviso('')} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
-        <Alert severity="success" variant="filled" onClose={() => setAviso('')} sx={{ bgcolor: '#1F8A4C' }}>{aviso}</Alert>
+        <Alert severity="success" variant="filled" onClose={() => setAviso('')}>{aviso}</Alert>
       </Snackbar>
     </Stack>
   )

@@ -18,6 +18,7 @@ import TableRow from '@mui/material/TableRow'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import CloseIcon from '@mui/icons-material/Close'
+import { usePrefs } from '../prefs'
 
 export function cnpjFormatado(valor: string | null | undefined) {
   const d = String(valor || '').replace(/\D/g, '')
@@ -32,11 +33,11 @@ export function quando(iso: string | null | undefined) {
 }
 
 const TONS = {
-  ok: { color: '#B7E4C7', border: '#1F8A4C', bg: 'rgba(31,138,76,0.16)' },
-  alerta: { color: '#FFD7C2', border: '#C45A28', bg: 'rgba(255,90,10,0.12)' },
-  erro: { color: '#FFB4B4', border: '#E23B3B', bg: 'rgba(226,59,59,0.14)' },
-  info: { color: '#BFD9F2', border: '#3A6E9E', bg: 'rgba(58,110,158,0.16)' },
-  neutro: { color: '#C5D0D8', border: '#3A4C5A', bg: 'transparent' },
+  ok: { color: '#047857', border: 'rgba(5,150,105,0.45)', bg: 'rgba(5,150,105,0.12)' },
+  alerta: { color: '#C2410C', border: 'rgba(232,82,10,0.4)', bg: '#FFF7F3' },
+  erro: { color: '#B91C1C', border: 'rgba(220,38,38,0.4)', bg: 'rgba(220,38,38,0.08)' },
+  info: { color: '#1B2A6B', border: 'rgba(27,42,107,0.28)', bg: 'rgba(27,42,107,0.08)' },
+  neutro: { color: '#4B5563', border: '#D1D5DB', bg: 'transparent' },
 }
 
 export type Tom = keyof typeof TONS
@@ -104,6 +105,7 @@ export function TabelaConfig<T>({ colunas, linhas, chave, vazio = 'Nada encontra
   rodape?: ReactNode
   paginacao?: Paginacao
 }) {
+  const { t } = usePrefs()
   return (
     <Paper variant="outlined" sx={{ overflow: 'auto' }}>
       <Table size="small" stickyHeader>
@@ -135,9 +137,17 @@ export function TabelaConfig<T>({ colunas, linhas, chave, vazio = 'Nada encontra
           rowsPerPage={paginacao.por}
           rowsPerPageOptions={[paginacao.por]}
           onPageChange={(_, pagina) => paginacao.onPagina(pagina)}
-          labelDisplayedRows={({ from, to, count }) => `${from}–${to} de ${count}`}
-          labelRowsPerPage="Por página"
-          sx={{ borderTop: '1px solid', borderColor: 'divider' }}
+          labelDisplayedRows={({ from, to, count }) => t(`${from}–${to} de ${count}`, `${from}–${to} of ${count}`)}
+          labelRowsPerPage={t('Por página', 'Per page')}
+          sx={{
+            borderTop: '1px solid',
+            borderColor: 'divider',
+            '& .MuiTablePagination-toolbar': { minHeight: 32, height: 32, pl: 1.5, pr: 0.5 },
+            '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': { fontSize: 12, m: 0 },
+            '& .MuiTablePagination-select': { fontSize: 12 },
+            '& .MuiTablePagination-actions': { ml: 0.5 },
+            '& .MuiTablePagination-actions .MuiIconButton-root': { p: 0.25 },
+          }}
         />
       ) : null}
       {rodape ? (
@@ -208,7 +218,7 @@ export function Erro({ erro }: { erro: string }) {
 export function Aviso({ texto, onFechar }: { texto: string; onFechar: () => void }) {
   return (
     <Snackbar open={!!texto} autoHideDuration={3600} onClose={onFechar} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
-      <Alert severity="success" variant="filled" onClose={onFechar} sx={{ bgcolor: '#1F8A4C' }}>{texto}</Alert>
+      <Alert severity="success" variant="filled" onClose={onFechar}>{texto}</Alert>
     </Snackbar>
   )
 }
@@ -216,11 +226,12 @@ export function Aviso({ texto, onFechar }: { texto: string; onFechar: () => void
 export type Situacao = 'ativos' | 'inativos' | 'todos'
 
 export function FiltroSituacao({ valor, onMudar }: { valor: Situacao; onMudar: (valor: Situacao) => void }) {
+  const { t } = usePrefs()
   return (
     <TextField select size="small" value={valor} onChange={(ev) => onMudar(ev.target.value as Situacao)} sx={{ minWidth: 150, bgcolor: 'background.paper' }}>
-      <MenuItem value="ativos">Ativos</MenuItem>
-      <MenuItem value="inativos">Inativos</MenuItem>
-      <MenuItem value="todos">Todos</MenuItem>
+      <MenuItem value="ativos">{t('Ativos', 'Active')}</MenuItem>
+      <MenuItem value="inativos">{t('Inativos', 'Inactive')}</MenuItem>
+      <MenuItem value="todos">{t('Todos', 'All')}</MenuItem>
     </TextField>
   )
 }
@@ -239,24 +250,25 @@ export function AcoesForm({ existe, emUso, salvando, podeSalvar, onSalvar, onExc
   onFechar: () => void
 }) {
   const [confirmando, setConfirmando] = useState(false)
+  const { t } = usePrefs()
   return (
     <Stack spacing={1.5} sx={{ flex: 1 }}>
       {confirmando ? (
         <Alert severity="warning" onClose={() => setConfirmando(false)}>
           {emUso
-            ? 'Está em uso, então vai ser inativado: sai das listas e da escolha em novos lançamentos, mas continua no histórico.'
-            : 'Não tem uso e vai ser excluído de vez.'}
+            ? t('Está em uso, então vai ser inativado: sai das listas e da escolha em novos lançamentos, mas continua no histórico.', 'It is in use, so it will be deactivated: it leaves the lists and new entries, but stays in history.')
+            : t('Não tem uso e vai ser excluído de vez.', 'It is unused and will be deleted for good.')}
         </Alert>
       ) : null}
       <Stack direction="row" spacing={1}>
         {existe ? (
           <Button color="error" disabled={salvando} onClick={() => (confirmando ? onExcluir() : setConfirmando(true))}>
-            {confirmando ? (emUso ? 'Confirmar inativação' : 'Confirmar exclusão') : (emUso ? 'Inativar' : 'Excluir')}
+            {confirmando ? (emUso ? t('Confirmar inativação', 'Confirm deactivation') : t('Confirmar exclusão', 'Confirm delete')) : (emUso ? t('Inativar', 'Deactivate') : t('Excluir', 'Delete'))}
           </Button>
         ) : null}
         <Box sx={{ flex: 1 }} />
-        <Button onClick={onFechar}>Cancelar</Button>
-        <Button variant="contained" disabled={salvando || !podeSalvar} onClick={onSalvar}>{salvando ? 'Salvando…' : 'Salvar'}</Button>
+        <Button onClick={onFechar}>{t('Cancelar', 'Cancel')}</Button>
+        <Button variant="contained" disabled={salvando || !podeSalvar} onClick={onSalvar}>{salvando ? t('Salvando…', 'Saving…') : t('Salvar', 'Save')}</Button>
       </Stack>
     </Stack>
   )

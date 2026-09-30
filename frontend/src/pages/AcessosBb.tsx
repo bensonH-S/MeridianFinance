@@ -78,7 +78,7 @@ export function AcessosBb() {
       render: (a) => (a.ultima_coleta ? (
         <>
           <Typography sx={{ fontSize: 13 }}>{quando(a.ultima_coleta)}</Typography>
-          <Typography sx={{ fontSize: 12, color: a.ultimo_ok === false ? '#FFB4B4' : 'text.secondary', maxWidth: 280 }} noWrap title={a.ultima_mensagem || ''}>
+          <Typography sx={{ fontSize: 12, color: a.ultimo_ok === false ? 'error.main' : 'text.secondary', maxWidth: 280 }} noWrap title={a.ultima_mensagem || ''}>
             {a.ultima_mensagem}
           </Typography>
         </>
@@ -119,7 +119,7 @@ export function AcessosBb() {
       ) : null}
 
       <Snackbar open={!!aviso} autoHideDuration={3600} onClose={() => setAviso('')} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
-        <Alert severity="success" variant="filled" onClose={() => setAviso('')} sx={{ bgcolor: '#1F8A4C' }}>{aviso}</Alert>
+        <Alert severity="success" variant="filled" onClose={() => setAviso('')}>{aviso}</Alert>
       </Snackbar>
     </Stack>
   )
@@ -133,7 +133,7 @@ function Arquivo({ rotulo, nome, carregado, accept, onEscolher }: {
   onEscolher: (arquivo: File) => void
 }) {
   return (
-    <Paper variant="outlined" sx={{ p: 1.5, display: 'flex', alignItems: 'center', gap: 1.5, bgcolor: '#0F1A23' }}>
+    <Paper variant="outlined" sx={{ p: 1.5, display: 'flex', alignItems: 'center', gap: 1.5, bgcolor: 'var(--ga-canvas-alt)' }}>
       <UploadFileOutlinedIcon fontSize="small" sx={{ color: 'text.secondary' }} />
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Typography sx={{ fontSize: 13, fontWeight: 500 }}>{rotulo}</Typography>

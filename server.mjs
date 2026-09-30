@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import pg from 'pg'
 import { acharFornecedor, classificar, lerArquivoDda, lerCnab240 } from './lib/dda.mjs'
-import { baixarRetornos, configSfg } from './lib/itauSfg.mjs'
+import { baixarRetornos, garantirSchemaItau, lerItau, montarConfig, registrarItau, salvarItau } from './lib/itauSfg.mjs'
 import {
   configPronta,
   credenciaisAtivasBb,
@@ -629,6 +629,22 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && url.pathname === '/api/dda/sfg') {
       return send(res, 200, JSON.stringify(estadoSfg))
     }
+    if (req.method === 'GET' && url.pathname === '/api/config/itau') {
+      const acesso = await lerItau(pool, env)
+      return send(res, 200, JSON.stringify(acesso.publico))
+    }
+    if (req.method === 'PUT' && url.pathname === '/api/config/itau') {
+      const body = await readBody(req)
+      try {
+        return send(res, 200, JSON.stringify(await salvarItau(pool, body)))
+      } catch (err) {
+        return send(res, err.status || 400, JSON.stringify({ erro: err.message || 'Não salvou o acesso.' }))
+      }
+    }
+    if (req.method === 'POST' && url.pathname === '/api/config/itau/coletar') {
+      cicloSfg().catch((err) => console.error(`[sfg] ${err.message}`))
+      return send(res, 202, JSON.stringify({ ok: true }))
+    }
     if (req.method === 'GET' && url.pathname === '/api/config/bb') {
       return send(res, 200, JSON.stringify(await listarAcessosBb(pool)))
     }
@@ -689,7 +705,8 @@ let estadoBb = {
 
 async function cicloSfg() {
   if (coletaSfg) return
-  const config = configSfg(env)
+  const acesso = await lerItau(pool, env).catch(() => null)
+  const config = montarConfig(acesso?.linha, env)
   if (!config) {
     estadoSfg = {
       ok: false,
@@ -732,10 +749,12 @@ async function cicloSfg() {
       ? `${baixados.length} arquivo(s) da VAN, ${criadas} boleto(s) novo(s).`
       : 'VAN consultada. Nenhum retorno novo.'
     estadoSfg = { ok: true, mensagem, criadas, em: new Date().toISOString() }
+    await registrarItau(pool, true, mensagem).catch(() => {})
     console.log(`[sfg] ${mensagem}`)
   } catch (err) {
     const mensagem = err.message || 'Falha ao puxar a VAN do Itaú'
     estadoSfg = { ok: false, mensagem, criadas: 0, em: new Date().toISOString() }
+    await registrarItau(pool, false, mensagem).catch(() => {})
     console.error(`[sfg] ${mensagem}`)
   } finally {
     coletaSfg = null
@@ -826,6 +845,7 @@ server.listen(port, '127.0.0.1', () => {
     setInterval(cicloSfg, intervaloSfg)
   }
   garantirSchemaBb(pool).catch((err) => console.error(`[bb] ${err.message}`))
+  garantirSchemaItau(pool).catch((err) => console.error(`[sfg] ${err.message}`))
   if (intervaloBb >= 60000) {
     console.log(`[bb] coleta automática a cada ${Math.round(intervaloBb / 1000)}s`)
     setTimeout(cicloBb, 15000)

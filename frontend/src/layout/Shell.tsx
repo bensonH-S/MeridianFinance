@@ -1,8 +1,17 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { ThemeProvider } from '@mui/material/styles'
 import { api } from '../api'
+import { theme } from '../theme'
+import { temaEscuro } from '../temaEscuro'
+import { temaPagar } from '../temaPagar'
+import { usePrefs } from '../prefs'
 import Box from '@mui/material/Box'
+import IconButton from '@mui/material/IconButton'
+import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
+import DarkModeOutlinedIcon from '@mui/icons-material/DarkModeOutlined'
+import LightModeOutlinedIcon from '@mui/icons-material/LightModeOutlined'
 import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined'
 import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined'
 import PointOfSaleOutlinedIcon from '@mui/icons-material/PointOfSaleOutlined'
@@ -14,56 +23,57 @@ import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined'
 
 const grupos = [
   {
-    titulo: 'Operação',
+    titulo: ['Operação', 'Operations'],
     itens: [
-      { to: '/', label: 'Contas a pagar', icon: <PaymentsOutlinedIcon /> },
-      { to: '/receber', label: 'Contas a receber', icon: <AccountBalanceWalletOutlinedIcon /> },
-      { to: '/caixa', label: 'Fechamento de caixa', icon: <PointOfSaleOutlinedIcon /> },
-      { to: '/movimento', label: 'Contas movimento', icon: <SwapHorizOutlinedIcon /> },
+      { to: '/', label: ['Contas a pagar', 'Accounts payable'], icon: <PaymentsOutlinedIcon /> },
+      { to: '/receber', label: ['Contas a receber', 'Accounts receivable'], icon: <AccountBalanceWalletOutlinedIcon /> },
+      { to: '/caixa', label: ['Fechamento de caixa', 'Cash closing'], icon: <PointOfSaleOutlinedIcon /> },
+      { to: '/movimento', label: ['Contas movimento', 'Cash movement'], icon: <SwapHorizOutlinedIcon /> },
     ],
   },
   {
-    titulo: 'Gestão',
+    titulo: ['Gestão', 'Management'],
     itens: [
-      { to: '/vendas', label: 'Vendas', icon: <StorefrontOutlinedIcon /> },
-      { to: '/dre', label: 'DRE', icon: <AssessmentOutlinedIcon /> },
-      { to: '/integracoes', label: 'Integrações', icon: <HubOutlinedIcon /> },
+      { to: '/vendas', label: ['Vendas', 'Sales'], icon: <StorefrontOutlinedIcon /> },
+      { to: '/dre', label: ['DRE', 'P&L'], icon: <AssessmentOutlinedIcon /> },
+      { to: '/integracoes', label: ['Integrações', 'Integrations'], icon: <HubOutlinedIcon /> },
     ],
   },
   {
-    titulo: 'Sistema',
-    itens: [{ to: '/configuracoes', label: 'Configuração', icon: <SettingsOutlinedIcon /> }],
+    titulo: ['Sistema', 'System'],
+    itens: [{ to: '/configuracoes', label: ['Configuração', 'Settings'], icon: <SettingsOutlinedIcon /> }],
   },
 ]
 
-const titulos: Record<string, { title: string; subtitle: string }> = {
-  '/': {
-    title: 'Contas a pagar',
-    subtitle: 'A origem da despesa e a conta que paga podem ser diferentes.',
-  },
-  '/receber': { title: 'Contas a receber', subtitle: 'Módulo em desenvolvimento.' },
-  '/caixa': { title: 'Fechamento de caixa', subtitle: 'Módulo em desenvolvimento.' },
-  '/movimento': { title: 'Contas movimento', subtitle: 'Módulo em desenvolvimento.' },
-  '/vendas': {
-    title: 'Vendas',
-    subtitle: 'Entra sozinha, a cada poucos minutos.',
-  },
-  '/dre': { title: 'DRE', subtitle: 'Módulo em desenvolvimento.' },
-  '/integracoes': { title: 'Integrações', subtitle: 'Boletos do DDA no nome das empresas.' },
-  '/configuracoes': { title: 'Configuração', subtitle: 'Cadastros e os acessos das APIs.' },
-  '/configuracoes/bkoffice': { title: 'BK Office', subtitle: 'Usuário e endereço usados para trazer as vendas.' },
-  '/configuracoes/bb': { title: 'Banco do Brasil', subtitle: 'Credenciais da API de DDA.' },
-  '/configuracoes/empresas': { title: 'Empresas', subtitle: 'Lojas e holdings.' },
-  '/configuracoes/contas': { title: 'Contas bancárias', subtitle: 'Caixa, Banco do Brasil e Itaú.' },
-  '/configuracoes/plano': { title: 'Plano de contas', subtitle: 'Classificação do que é a pagar.' },
-  '/configuracoes/fornecedores': { title: 'Fornecedores', subtitle: 'Cadastro financeiro e o plano padrão.' },
-  '/configuracoes/formas': { title: 'Formas de pagamento', subtitle: 'Como cada despesa sai.' },
-  '/configuracoes/usuarios': { title: 'Usuários', subtitle: 'Quem prepara e quem autoriza.' },
+const titulos: Record<string, [string, string, string, string]> = {
+  '/': ['Contas a pagar', 'Accounts payable', 'A origem da despesa e a conta que paga podem ser diferentes.', 'The expense source and the paying account can differ.'],
+  '/receber': ['Contas a receber', 'Accounts receivable', 'Módulo em desenvolvimento.', 'Module in progress.'],
+  '/caixa': ['Fechamento de caixa', 'Cash closing', 'Módulo em desenvolvimento.', 'Module in progress.'],
+  '/movimento': ['Contas movimento', 'Cash movement', 'Módulo em desenvolvimento.', 'Module in progress.'],
+  '/vendas': ['Vendas', 'Sales', 'Entra sozinha, a cada poucos minutos.', 'Comes in on its own, every few minutes.'],
+  '/dre': ['DRE', 'P&L', 'Módulo em desenvolvimento.', 'Module in progress.'],
+  '/integracoes': ['Integrações', 'Integrations', 'Boletos do DDA no nome das empresas.', 'DDA boletos in the company name.'],
+  '/configuracoes': ['Configuração', 'Settings', 'Cadastros e os acessos das APIs.', 'Records and API access.'],
+  '/configuracoes/bkoffice': ['BK Office', 'BK Office', 'Usuário e endereço usados para trazer as vendas.', 'User and address used to pull sales.'],
+  '/configuracoes/itau': ['Itaú', 'Itaú', 'Caixa postal da VAN para o retorno de DDA.', 'VAN mailbox for the DDA return file.'],
+  '/configuracoes/bb': ['Banco do Brasil', 'Banco do Brasil', 'Credenciais da API de DDA.', 'DDA API credentials.'],
+  '/configuracoes/empresas': ['Empresas', 'Companies', 'Lojas e holdings.', 'Stores and holdings.'],
+  '/configuracoes/contas': ['Contas bancárias', 'Bank accounts', 'Caixa, Banco do Brasil e Itaú.', 'Cash, Banco do Brasil and Itaú.'],
+  '/configuracoes/plano': ['Plano de contas', 'Chart of accounts', 'Classificação do que é a pagar.', 'How payables are classified.'],
+  '/configuracoes/fornecedores': ['Fornecedores', 'Suppliers', 'Cadastro financeiro e o plano padrão.', 'Financial record and default account.'],
+  '/configuracoes/formas': ['Formas de pagamento', 'Payment methods', 'Como cada despesa sai.', 'How each expense is paid.'],
+  '/configuracoes/usuarios': ['Usuários', 'Users', 'Quem prepara e quem autoriza.', 'Who prepares and who authorizes.'],
 }
 
 export function Shell() {
   const { pathname } = useLocation()
-  const pagina = titulos[pathname] ?? { title: 'Meridian Finance', subtitle: '' }
+  const { modo, setModo, idioma, setIdioma, t } = usePrefs()
+  const escuro = modo === 'escuro'
+  const pagar = pathname === '/'
+  const texto = titulos[pathname]
+  const pagina = texto
+    ? { title: idioma === 'en' ? texto[1] : texto[0], subtitle: idioma === 'en' ? texto[3] : texto[2] }
+    : { title: 'Meridian Finance', subtitle: '' }
   const [sessao, setSessao] = useState({ versao: '…', nome: 'Felipe', papel: 'Autoriza' })
 
   useEffect(() => {
@@ -73,13 +83,14 @@ export function Shell() {
   }, [])
 
   return (
-    <Box sx={{ display: 'flex', height: '100%', bgcolor: 'background.default', overflow: 'hidden' }}>
+    <ThemeProvider theme={escuro ? temaEscuro : pagar ? temaPagar : theme}>
+    <Box className={escuro ? 'tema-escuro' : pagar ? 'tema-pagar' : undefined} sx={{ display: 'flex', height: '100%', bgcolor: 'background.default', overflow: 'hidden' }}>
       <Box
         component="aside"
         sx={{
           width: 200,
           flexShrink: 0,
-          bgcolor: '#060B10',
+          bgcolor: 'var(--ga-sidebar-bg)',
           borderRight: '1px solid',
           borderColor: 'divider',
           display: 'flex',
@@ -87,21 +98,15 @@ export function Shell() {
           height: '100%',
         }}
       >
-        <Box
-          sx={{
-            height: 72,
-            px: 1.25,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Box
-            component="img"
-            src={`${import.meta.env.BASE_URL}logo-meridian.png?v=2`}
-            alt="Central GA"
-            sx={{ width: '100%', height: 'auto', display: 'block' }}
-          />
+        <Box sx={{ px: 1.25, pt: 1.75, pb: 0.5 }}>
+          <Box sx={{ bgcolor: 'var(--ga-logo-plate, #111827)', borderRadius: 1.5, px: 1, py: 0.75 }}>
+            <Box
+              component="img"
+              src={`${import.meta.env.BASE_URL}logo-meridian.png?v=2`}
+              alt="Central GA"
+              sx={{ width: '100%', height: 'auto', display: 'block' }}
+            />
+          </Box>
         </Box>
 
         <Box component="nav" sx={{ flex: 1, px: 1.25, py: 1.75, overflowY: 'auto' }}>
@@ -115,10 +120,10 @@ export function Shell() {
                   fontWeight: 500,
                   letterSpacing: '0.05em',
                   textTransform: 'uppercase',
-                  color: 'text.disabled',
+                  color: 'var(--ga-sidebar-muted)',
                 }}
               >
-                {grupo.titulo}
+                {idioma === 'en' ? grupo.titulo[1] : grupo.titulo[0]}
               </Typography>
               {grupo.itens.map((item) => (
                 <NavLink key={item.to} to={item.to} end={item.to === '/'} style={{ textDecoration: 'none' }}>
@@ -136,20 +141,21 @@ export function Shell() {
                           borderRadius: '8px',
                           fontSize: 13,
                           fontWeight: 500,
-                          color: ativo ? '#fff' : '#B9C5CE',
-                          background: ativo ? 'linear-gradient(90deg, rgba(255,90,10,.20), rgba(255,90,10,.06))' : 'transparent',
-                          boxShadow: ativo ? 'inset 3px 0 #FF5A0A' : 'none',
+                          color: ativo ? 'var(--ga-sidebar-active-text)' : 'var(--ga-text-primary)',
+                          bgcolor: ativo ? 'var(--ga-sidebar-active-bg)' : 'transparent',
+                          borderLeft: '3px solid',
+                          borderColor: ativo ? 'var(--ga-sidebar-active-border)' : 'transparent',
                           '&:hover': {
-                            background: ativo ? 'linear-gradient(90deg, rgba(255,90,10,.20), rgba(255,90,10,.06))' : 'rgba(255,255,255,0.04)',
+                            bgcolor: ativo ? 'var(--ga-sidebar-active-bg)' : 'var(--ga-sidebar-hover)',
                           },
                           '& .MuiSvgIcon-root': {
                             fontSize: 17,
-                            color: ativo ? '#FF5A0A' : '#B9C5CE',
+                            color: ativo ? 'var(--ga-sidebar-active-icon)' : 'var(--ga-text-primary)',
                           },
                         }}
                       >
                         {item.icon}
-                        {item.label}
+                        {idioma === 'en' ? item.label[1] : item.label[0]}
                       </Box>
                     )
                   }}
@@ -158,15 +164,15 @@ export function Shell() {
             </Box>
           ))}
         </Box>
-        <Box sx={{ px: 1.5, py: 1.5, borderTop: '1px solid #1C2A35', display: 'flex', alignItems: 'center', gap: 1.25 }}>
+        <Box sx={{ px: 1.5, py: 1.5, borderTop: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1.25 }}>
           <Box
             aria-hidden
             sx={{
               width: 32,
               height: 32,
               borderRadius: '50%',
-              bgcolor: 'rgba(255,90,10,0.16)',
-              color: '#FF5A0A',
+              bgcolor: 'var(--ga-sidebar-active-bg)',
+              color: 'var(--ga-sidebar-active-text)',
               display: 'grid',
               placeItems: 'center',
               fontSize: 13,
@@ -177,9 +183,9 @@ export function Shell() {
             {sessao.nome.slice(0, 1)}
           </Box>
           <Box sx={{ minWidth: 0 }}>
-            <Typography sx={{ fontSize: 13, fontWeight: 600, lineHeight: 1.2 }} noWrap>{sessao.nome}</Typography>
-            <Typography sx={{ fontSize: 12, color: '#8FA0AF', lineHeight: 1.2 }} noWrap>
-              {sessao.papel} · {sessao.versao}
+            <Typography sx={{ fontSize: 13, fontWeight: 600, lineHeight: 1.2, color: 'var(--ga-sidebar-text)' }} noWrap>{sessao.nome}</Typography>
+            <Typography sx={{ fontSize: 12, color: 'var(--ga-sidebar-muted)', lineHeight: 1.2 }} noWrap>
+              {(idioma === 'en' ? ({ Autoriza: 'Authorizes', Prepara: 'Prepares' } as Record<string, string>)[sessao.papel] : null) || sessao.papel} · {sessao.versao}
             </Typography>
           </Box>
         </Box>
@@ -195,18 +201,50 @@ export function Shell() {
             alignItems: 'center',
             gap: 2,
             px: 3,
-            borderBottom: '1px solid #1C2A35',
+            borderBottom: '1px solid',
+            borderColor: 'divider',
+            bgcolor: 'background.paper',
           }}
         >
-          <Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography component="h1" sx={{ fontWeight: 600, fontSize: 18, letterSpacing: '-0.02em', lineHeight: 1.15 }}>
               {pagina.title}
             </Typography>
             {pagina.subtitle && (
-              <Typography sx={{ fontSize: 13, fontWeight: 400, color: '#8FA0AF', lineHeight: 1.2, mt: 0.25 }}>
+              <Typography sx={{ fontSize: 13, fontWeight: 400, color: 'text.secondary', lineHeight: 1.2, mt: 0.25 }}>
                 {pagina.subtitle}
               </Typography>
             )}
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
+            <Box sx={{ display: 'flex', border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden' }}>
+              {(['pt', 'en'] as const).map((opcao) => (
+                <Box
+                  key={opcao}
+                  component="button"
+                  type="button"
+                  onClick={() => setIdioma(opcao)}
+                  sx={{
+                    border: 0,
+                    cursor: 'pointer',
+                    px: 1,
+                    py: 0.4,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    fontFamily: 'inherit',
+                    color: idioma === opcao ? 'primary.contrastText' : 'text.secondary',
+                    bgcolor: idioma === opcao ? 'primary.main' : 'transparent',
+                  }}
+                >
+                  {opcao.toUpperCase()}
+                </Box>
+              ))}
+            </Box>
+            <Tooltip title={escuro ? t('Tema claro', 'Light theme') : t('Tema escuro', 'Dark theme')}>
+              <IconButton size="small" aria-label={escuro ? 'Light theme' : 'Dark theme'} onClick={() => setModo(escuro ? 'claro' : 'escuro')} sx={{ color: 'text.secondary' }}>
+                {escuro ? <LightModeOutlinedIcon fontSize="small" /> : <DarkModeOutlinedIcon fontSize="small" />}
+              </IconButton>
+            </Tooltip>
           </Box>
         </Box>
         <Box component="main" sx={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', px: 3, py: 2.5 }}>
@@ -214,5 +252,6 @@ export function Shell() {
         </Box>
       </Box>
     </Box>
+    </ThemeProvider>
   )
 }

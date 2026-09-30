@@ -11,6 +11,7 @@ import TableRow from '@mui/material/TableRow'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { api, brl, type ResumoVendas } from '../api'
+import { usePrefs } from '../prefs'
 
 function hoje() {
   return new Intl.DateTimeFormat('en-CA', {
@@ -36,6 +37,7 @@ function quando(iso: string) {
 }
 
 export function VendasPage() {
+  const { t } = usePrefs()
   const [dia, setDia] = useState(hoje)
   const [resumo, setResumo] = useState<ResumoVendas | null>(null)
   const [erro, setErro] = useState('')
@@ -50,7 +52,7 @@ export function VendasPage() {
         setErro('')
       } catch (err) {
         if (!vivo) return
-        setErro(err instanceof Error ? err.message : 'Não carregou as vendas')
+        setErro(err instanceof Error ? err.message : t('Não carregou as vendas', 'Could not load sales'))
       }
     }
     carregar()
@@ -68,7 +70,7 @@ export function VendasPage() {
     <Stack spacing={2}>
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ alignItems: { sm: 'center' } }}>
         <TextField
-          label="Dia"
+          label={t('Dia', 'Day')}
           type="date"
           size="small"
           value={dia}
@@ -77,7 +79,7 @@ export function VendasPage() {
         />
         <Box sx={{ flex: 1 }} />
         <Typography variant="body2" color="text.secondary">
-          {lojas.length} lojas · {brl(resumo?.venda_bruta ?? 0)} bruto
+          {lojas.length} {t('lojas', 'stores')} · {brl(resumo?.venda_bruta ?? 0)} {t('bruto', 'gross')}
           {sync?.criado_em ? ` · ${quando(sync.criado_em)}` : ''}
         </Typography>
       </Stack>
@@ -90,11 +92,11 @@ export function VendasPage() {
           <TableHead>
             <TableRow>
               <TableCell>BKN</TableCell>
-              <TableCell>Loja</TableCell>
-              <TableCell align="right">Produtos</TableCell>
-              <TableCell align="right">Quantidade</TableCell>
-              <TableCell align="right">Bruto</TableCell>
-              <TableCell align="right">Líquido</TableCell>
+              <TableCell>{t('Loja', 'Store')}</TableCell>
+              <TableCell align="right">{t('Produtos', 'Products')}</TableCell>
+              <TableCell align="right">{t('Quantidade', 'Quantity')}</TableCell>
+              <TableCell align="right">{t('Bruto', 'Gross')}</TableCell>
+              <TableCell align="right">{t('Líquido', 'Net')}</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -102,7 +104,7 @@ export function VendasPage() {
               <TableRow>
                 <TableCell colSpan={6}>
                   <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
-                    Nenhuma venda neste dia.
+                    {t('Nenhuma venda neste dia.', 'No sales on this day.')}
                   </Typography>
                 </TableCell>
               </TableRow>

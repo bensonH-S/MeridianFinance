@@ -15,6 +15,7 @@ import TableRow from '@mui/material/TableRow'
 import Typography from '@mui/material/Typography'
 import UploadFileOutlinedIcon from '@mui/icons-material/UploadFileOutlined'
 import { api, brl, type LinhaDda } from '../api'
+import { usePrefs } from '../prefs'
 
 function base64(buffer: ArrayBuffer) {
   const bytes = new Uint8Array(buffer)
@@ -32,6 +33,7 @@ function dataBr(iso: string) {
 }
 
 export function DdaPage() {
+  const { t } = usePrefs()
   const input = useRef<HTMLInputElement>(null)
   const [linhas, setLinhas] = useState<LinhaDda[]>([])
   const [marcadas, setMarcadas] = useState<boolean[]>([])
@@ -59,7 +61,7 @@ export function DdaPage() {
     } catch (err) {
       setLinhas([])
       setMarcadas([])
-      setErro(err instanceof Error ? err.message : 'Não leu o arquivo')
+      setErro(err instanceof Error ? err.message : t('Não leu o arquivo', 'Could not read the file'))
     } finally {
       setLendo(false)
       if (input.current) input.current.value = ''
@@ -71,14 +73,14 @@ export function DdaPage() {
     setErro('')
     try {
       const resultado = await api.importarDda(prontas)
-      setAviso(resultado.criadas === 1 ? '1 boleto importado.' : `${resultado.criadas} boletos importados.`)
+      setAviso(resultado.criadas === 1 ? t('1 boleto importado.', '1 boleto imported.') : t(`${resultado.criadas} boletos importados.`, `${resultado.criadas} boletos imported.`))
       const previa = linhas.map((linha, indice) => (
         linha.pronto && marcadas[indice] ? { ...linha, pronto: false, motivo: 'Já lançado' } : linha
       ))
       setLinhas(previa)
       setMarcadas(previa.map(() => false))
     } catch (err) {
-      setErro(err instanceof Error ? err.message : 'Não importou')
+      setErro(err instanceof Error ? err.message : t('Não importou', 'Import failed'))
     } finally {
       setSubindo(false)
     }
@@ -88,10 +90,10 @@ export function DdaPage() {
     <Stack spacing={2} sx={{ height: '100%', minHeight: 0 }}>
       <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} sx={{ alignItems: { md: 'center' } }}>
         <Typography sx={{ color: 'text.secondary', fontSize: 14, flex: 1 }}>
-          O Finance puxa o retorno de DDA na VAN do Itaú sozinho. {sfg || 'Aguardando a coleta.'}
+          {t('O Finance puxa o retorno de DDA na VAN do Itaú sozinho.', 'Finance pulls the Itaú DDA return from the VAN on its own.')} {sfg || t('Aguardando a coleta.', 'Waiting for the next pull.')}
         </Typography>
-        <Button variant="contained" color="secondary" startIcon={<UploadFileOutlinedIcon />} disabled={lendo} onClick={() => input.current?.click()}>
-          {lendo ? 'Lendo…' : 'Escolher arquivo'}
+        <Button variant="contained" startIcon={<UploadFileOutlinedIcon />} disabled={lendo} onClick={() => input.current?.click()}>
+          {lendo ? t('Lendo…', 'Reading…') : t('Escolher arquivo', 'Choose file')}
         </Button>
         <input ref={input} hidden type="file" accept=".xlsx,.xls,.csv,.ret,.txt,.rem" onChange={(ev) => escolher(ev.target.files?.[0])} />
       </Stack>
@@ -103,18 +105,18 @@ export function DdaPage() {
           <TableHead>
             <TableRow>
               <TableCell padding="checkbox" />
-              <TableCell>Empresa</TableCell>
-              <TableCell>Cedente</TableCell>
-              <TableCell>Vencimento</TableCell>
-              <TableCell align="right">Valor</TableCell>
-              <TableCell>Situação</TableCell>
+              <TableCell>{t('Empresa', 'Company')}</TableCell>
+              <TableCell>{t('Cedente', 'Payee')}</TableCell>
+              <TableCell>{t('Vencimento', 'Due date')}</TableCell>
+              <TableCell align="right">{t('Valor', 'Amount')}</TableCell>
+              <TableCell>{t('Situação', 'Status')}</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {linhas.length === 0 && (
               <TableRow>
                 <TableCell colSpan={6}>
-                  <Box sx={{ py: 6, textAlign: 'center', color: 'text.secondary' }}>Nenhuma planilha carregada.</Box>
+                  <Box sx={{ py: 6, textAlign: 'center', color: 'text.secondary' }}>{t('Nenhuma planilha carregada.', 'No file loaded.')}</Box>
                 </TableCell>
               </TableRow>
             )}
@@ -137,8 +139,8 @@ export function DdaPage() {
                 <TableCell align="right">{linha.valor == null ? '—' : brl(linha.valor)}</TableCell>
                 <TableCell>
                   {linha.pronto && !linha.fornecedor_id
-                    ? <Chip size="small" label="Sem fornecedor" variant="outlined" sx={{ color: '#E8A87C', borderColor: '#6B4A32', fontWeight: 500 }} />
-                    : <Typography variant="body2" color={linha.pronto ? 'text.primary' : 'warning.main'}>{linha.pronto ? 'Fornecedor vinculado' : linha.motivo}</Typography>}
+                    ? <Chip size="small" label={t('Sem fornecedor', 'No supplier')} variant="outlined" color="warning" sx={{ fontWeight: 500 }} />
+                    : <Typography variant="body2" color={linha.pronto ? 'text.primary' : 'warning.main'}>{linha.pronto ? t('Fornecedor vinculado', 'Supplier linked') : linha.motivo}</Typography>}
                 </TableCell>
               </TableRow>
             ))}
@@ -148,12 +150,12 @@ export function DdaPage() {
 
       <Stack direction="row" sx={{ justifyContent: 'flex-end' }}>
         <Button variant="contained" disabled={!prontas.length || subindo} onClick={subir}>
-          {subindo ? 'Subindo…' : `Subir ${prontas.length} boleto${prontas.length === 1 ? '' : 's'}`}
+          {subindo ? t('Subindo…', 'Importing…') : t(`Subir ${prontas.length} boleto${prontas.length === 1 ? '' : 's'}`, `Import ${prontas.length} boleto${prontas.length === 1 ? '' : 's'}`)}
         </Button>
       </Stack>
 
       <Snackbar open={!!aviso} autoHideDuration={3200} onClose={() => setAviso('')} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
-        <Alert severity="success" variant="filled" onClose={() => setAviso('')} sx={{ bgcolor: '#1F8A4C' }}>{aviso}</Alert>
+        <Alert severity="success" variant="filled" onClose={() => setAviso('')}>{aviso}</Alert>
       </Snackbar>
     </Stack>
   )
