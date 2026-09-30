@@ -1,6 +1,59 @@
 export type Empresa = { id: string; apelido: string; razao_social: string; tipo: 'loja' | 'holding'; cnpj?: string | null }
 export type Conta = { id: string; empresa_id: string; nome: string; tipo: string; apelido: string }
 export type Plano = { id: string; nome: string }
+export type PlanoCompleto = {
+  id: string
+  nome: string
+  tipo: 'a_pagar' | 'a_receber'
+  natureza: 'fixa' | 'variavel' | null
+  codigo_obrigacao: string | null
+  codigo_provisao: string | null
+  ativo: boolean
+  despesas: number
+  fornecedores: number
+}
+export type FornecedorCompleto = Fornecedor & {
+  razao_social: string | null
+  logradouro: string | null
+  numero: string | null
+  bairro: string | null
+  cidade: string | null
+  estado: string | null
+  cep: string | null
+  ativo: boolean
+  uso: number
+}
+export type PaginaFornecedores = { total: number; com_plano: number; linhas: FornecedorCompleto[] }
+export type EmpresaCompleta = {
+  id: string
+  apelido: string | null
+  razao_social: string
+  cnpj: string | null
+  bk_number: string | null
+  inscricao_estadual: string | null
+  endereco: string | null
+  cidade: string | null
+  cep: string | null
+  tipo: 'loja' | 'holding'
+  ativo: boolean
+  uso: number
+}
+export type ContaCompleta = {
+  id: string
+  empresa_id: string
+  apelido: string
+  nome: string | null
+  tipo: 'corrente' | 'dinheiro'
+  banco: 'itau' | 'banco_do_brasil' | null
+  agencia: string | null
+  numero: string | null
+  digito: string | null
+  ativa: boolean
+  uso: number
+}
+export type TipoCadastro = 'fornecedores' | 'empresas' | 'contas'
+export type Situacao = 'ativos' | 'inativos' | 'todos'
+export type Remocao = { id: string; inativado?: boolean; apagado?: boolean }
 export type Fornecedor = { id: string; nome: string; cpf_cnpj?: string | null; plano_conta_id: string | null; plano: string | null }
 export type Despesa = {
   id: string
@@ -125,7 +178,44 @@ export const api = {
     const url = URL.createObjectURL(await res.blob())
     window.open(url, '_blank', 'noopener')
   },
-  fornecedores: (q: string, limite?: number) => get<Fornecedor[]>(`${apiRoot}/fornecedores?q=${encodeURIComponent(q)}${limite ? `&limite=${limite}` : ''}`),
+  fornecedores: (q: string) => get<Fornecedor[]>(`${apiRoot}/fornecedores?q=${encodeURIComponent(q)}`),
+  listaFornecedores: (q: string, pagina: number, por: number, situacao: Situacao = 'ativos') =>
+    get<PaginaFornecedores>(`${apiRoot}/fornecedores/lista?q=${encodeURIComponent(q)}&pagina=${pagina}&por=${por}&situacao=${situacao}`),
+  empresasTodas: () => get<EmpresaCompleta[]>(`${apiRoot}/cadastros/empresas`),
+  contasTodas: () => get<ContaCompleta[]>(`${apiRoot}/cadastros/contas`),
+  salvarCadastro: async (tipo: TipoCadastro, id: string | null, body: Record<string, unknown>) => {
+    const res = await fetch(`${apiRoot}/cadastros/${tipo}${id ? `/${id}` : ''}`, {
+      method: id ? 'PUT' : 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.erro || 'Não salvou')
+    return data as { id: string }
+  },
+  removerCadastro: async (tipo: TipoCadastro, id: string) => {
+    const res = await fetch(`${apiRoot}/cadastros/${tipo}/${id}`, { method: 'DELETE' })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.erro || 'Não excluiu')
+    return data as Remocao
+  },
+  planosTodos: () => get<PlanoCompleto[]>(`${apiRoot}/plano/todos`),
+  salvarPlano: async (id: string | null, body: Record<string, unknown>) => {
+    const res = await fetch(`${apiRoot}/plano${id ? `/${id}` : ''}`, {
+      method: id ? 'PUT' : 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.erro || 'Não salvou')
+    return data as { id: string }
+  },
+  apagarPlano: async (id: string) => {
+    const res = await fetch(`${apiRoot}/plano/${id}`, { method: 'DELETE' })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.erro || 'Não apagou')
+    return data as { id: string; inativado?: boolean; apagado?: boolean }
+  },
   criarDespesa: async (body: Record<string, unknown>) => {
     const res = await fetch(`${apiRoot}/despesas`, {
       method: 'POST',

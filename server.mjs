@@ -16,6 +16,7 @@ import {
   removerAcessoBb,
   salvarAcessoBb,
 } from './lib/bbDda.mjs'
+import { removerCadastro, salvarCadastro, usoDe } from './lib/cadastros.mjs'
 import { gerarDanfe } from './lib/danfe.mjs'
 import { baixarBoletoDaDespesa, baixarNotaDaDespesa } from './lib/boletoEsupri.mjs'
 import { cruzarNotas } from './lib/nfEntrada.mjs'
@@ -373,6 +374,111 @@ const server = http.createServer(async (req, res) => {
         select id, nome from plano_contas where ativo and tipo = 'a_pagar' order by nome
       `)
       return send(res, 200, JSON.stringify(rows))
+    }
+    if (req.method === 'GET' && url.pathname === '/api/cadastros/empresas') {
+      const { rows } = await pool.query(`
+        select id, apelido, razao_social, cnpj, bk_number, inscricao_estadual, endereco, cidade, cep, tipo, ativo
+        from empresas
+        order by ativo desc, tipo, apelido
+      `)
+      const uso = await usoDe(pool, 'empresas', rows.map((r) => r.id))
+      return send(res, 200, JSON.stringify(rows.map((r) => ({ ...r, uso: uso[r.id] || 0 }))))
+    }
+    if (req.method === 'GET' && url.pathname === '/api/cadastros/contas') {
+      const { rows } = await pool.query(`
+        select c.id, c.empresa_id, c.nome, c.tipo, c.banco, c.agencia, c.numero, c.digito, c.ativa, e.apelido
+        from contas_bancarias c
+        join empresas e on e.id = c.empresa_id
+        order by c.ativa desc, e.apelido, c.tipo, c.nome
+      `)
+      const uso = await usoDe(pool, 'contas', rows.map((r) => r.id))
+      return send(res, 200, JSON.stringify(rows.map((r) => ({ ...r, uso: uso[r.id] || 0 }))))
+    }
+    if ((req.method === 'POST' && /^\/api\/cadastros\/[^/]+$/.test(url.pathname)) || (/^\/api\/cadastros\/[^/]+\/[^/]+$/.test(url.pathname) && (req.method === 'PUT' || req.method === 'DELETE'))) {
+      const [, , , tipo, id = null] = url.pathname.split('/')
+      try {
+        if (req.method === 'DELETE') return send(res, 200, JSON.stringify(await removerCadastro(pool, tipo, id)))
+        return send(res, 200, JSON.stringify(await salvarCadastro(pool, tipo, id, await readBody(req))))
+      } catch (err) {
+        if (!err.status) throw err
+        return send(res, err.status, JSON.stringify({ erro: err.message }))
+      }
+    }
+    if (req.method === 'GET' && url.pathname === '/api/plano/todos') {
+      const { rows } = await pool.query(`
+        select p.id, p.nome, p.tipo, p.natureza, p.codigo_obrigacao, p.codigo_provisao, p.ativo,
+               (select count(*)::int from despesas d where d.plano_conta_id = p.id) as despesas,
+               (select count(*)::int from fornecedores f where f.plano_conta_id = p.id) as fornecedores
+        from plano_contas p
+        order by p.ativo desc, p.tipo, p.nome
+      `)
+      return send(res, 200, JSON.stringify(rows))
+    }
+    if ((req.method === 'POST' && url.pathname === '/api/plano') || (/^\/api\/plano\/[^/]+$/.test(url.pathname) && (req.method === 'PUT' || req.method === 'DELETE'))) {
+      const id = req.method === 'POST' ? null : url.pathname.split('/').pop()
+      if (req.method === 'DELETE') {
+        const uso = await pool.query(`
+          select (select count(*) from despesas where plano_conta_id = $1) + (select count(*) from fornecedores where plano_conta_id = $1) as total
+        `, [id])
+        if (Number(uso.rows[0].total) > 0) {
+          await pool.query(`update plano_contas set ativo = false where id = $1`, [id])
+          return send(res, 200, JSON.stringify({ id, inativado: true }))
+        }
+        await pool.query(`delete from plano_contas where id = $1`, [id])
+        return send(res, 200, JSON.stringify({ id, apagado: true }))
+      }
+      const body = await readBody(req)
+      const nome = String(body.nome || '').trim()
+      if (!nome) return send(res, 400, JSON.stringify({ erro: 'Informe o nome do plano.' }))
+      const tipo = body.tipo === 'a_receber' ? 'a_receber' : 'a_pagar'
+      const natureza = ['fixa', 'variavel'].includes(body.natureza) ? body.natureza : null
+      const valores = [nome, tipo, natureza, String(body.codigo_obrigacao || '').trim() || null, String(body.codigo_provisao || '').trim() || null, body.ativo !== false]
+      try {
+        const { rows } = id
+          ? await pool.query(`
+              update plano_contas set nome = $1, tipo = $2, natureza = $3, codigo_obrigacao = $4, codigo_provisao = $5, ativo = $6
+              where id = $7 returning id
+            `, [...valores, id])
+          : await pool.query(`
+              insert into plano_contas (nome, tipo, natureza, codigo_obrigacao, codigo_provisao, ativo)
+              values ($1, $2, $3, $4, $5, $6) returning id
+            `, valores)
+        if (!rows.length) return send(res, 404, JSON.stringify({ erro: 'Plano não encontrado.' }))
+        return send(res, 200, JSON.stringify(rows[0]))
+      } catch (err) {
+        if (err.code === '23505') return send(res, 409, JSON.stringify({ erro: 'Já existe um plano com esse nome.' }))
+        throw err
+      }
+    }
+    if (req.method === 'GET' && url.pathname === '/api/fornecedores/lista') {
+      const q = (url.searchParams.get('q') || '').trim()
+      const por = Math.min(Math.max(Number(url.searchParams.get('por')) || 30, 1), 200)
+      const pagina = Math.max(Number(url.searchParams.get('pagina')) || 0, 0)
+      const digitos = q.replace(/\D/g, '')
+      const situacao = url.searchParams.get('situacao')
+      const params = []
+      let where = situacao === 'todos' ? 'where true' : situacao === 'inativos' ? 'where not f.ativo' : 'where f.ativo'
+      if (q) {
+        params.push(`%${q}%`, digitos.length >= 3 ? `%${digitos}%` : '-')
+        where += ` and (f.nome ilike $1 or f.razao_social ilike $1 or regexp_replace(coalesce(f.cpf_cnpj, ''), '\\D', '', 'g') like $2)`
+      }
+      const [contagem, linhas] = await Promise.all([
+        pool.query(`
+          select count(*)::int as total, count(f.plano_conta_id)::int as com_plano
+          from fornecedores f ${where}
+        `, params),
+        pool.query(`
+          select f.id, f.nome, f.razao_social, f.cpf_cnpj, f.plano_conta_id, p.nome as plano,
+                 f.logradouro, f.numero, f.bairro, f.cidade, f.estado, f.cep, f.ativo
+          from fornecedores f
+          left join plano_contas p on p.id = f.plano_conta_id
+          ${where}
+          order by f.nome
+          limit ${por} offset ${pagina * por}
+        `, params),
+      ])
+      const uso = await usoDe(pool, 'fornecedores', linhas.rows.map((r) => r.id))
+      return send(res, 200, JSON.stringify({ ...contagem.rows[0], linhas: linhas.rows.map((r) => ({ ...r, uso: uso[r.id] || 0 })) }))
     }
     if (req.method === 'GET' && url.pathname === '/api/fornecedores') {
       const q = (url.searchParams.get('q') || '').trim()

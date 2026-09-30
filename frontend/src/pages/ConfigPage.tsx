@@ -16,9 +16,17 @@ import LocalShippingOutlinedIcon from '@mui/icons-material/LocalShippingOutlined
 import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined'
 import PeopleOutlinedIcon from '@mui/icons-material/PeopleOutlined'
 import HubOutlinedIcon from '@mui/icons-material/HubOutlined'
-import { api, type ConfigBkoffice, type Conta, type Empresa, type Fornecedor, type Plano } from '../api'
-import { Barra, cnpjFormatado, PainelLateral, quando, Resumo, Resumos, Secao, Selo, TabelaConfig, Titulo, type Coluna } from '../components/ConfigUi'
+import AddIcon from '@mui/icons-material/Add'
+import FormControlLabel from '@mui/material/FormControlLabel'
+import MenuItem from '@mui/material/MenuItem'
+import Switch from '@mui/material/Switch'
+import { api, type ConfigBkoffice, type PlanoCompleto } from '../api'
+import {
+  Aviso, Barra, Erro, FiltroSituacao, mensagem, PainelLateral, porSituacao, quando, Resumo, Resumos, Secao, Selo, TabelaConfig, Titulo,
+  useBusca, type Coluna, type Situacao,
+} from '../components/ConfigUi'
 import { AcessosBb } from './AcessosBb'
+import { Contas, Empresas, Fornecedores, POR_PAGINA } from './Cadastros'
 
 const CARDS = [
   ['empresas', 'Empresas', 'Lojas e holdings. A loja entra com BK.', StorefrontOutlinedIcon],
@@ -83,153 +91,162 @@ export function ConfigDetalhePage() {
   )
 }
 
-function useBusca<T>(linhas: T[], texto: (linha: T) => string) {
-  const [busca, setBusca] = useState('')
-  const filtradas = useMemo(() => {
-    const termo = busca.trim().toLowerCase()
-    if (!termo) return linhas
-    const digitos = termo.replace(/\D/g, '')
-    return linhas.filter((l) => {
-      const alvo = texto(l).toLowerCase()
-      return alvo.includes(termo) || (digitos.length >= 3 && alvo.replace(/\D/g, '').includes(digitos))
-    })
-  }, [linhas, busca, texto])
-  return { busca, setBusca, filtradas }
-}
-
-function Erro({ erro }: { erro: string }) {
-  return erro ? <Alert severity="error">{erro}</Alert> : null
-}
-
-function mensagem(err: unknown) {
-  return err instanceof Error ? err.message : 'Não carregou'
-}
-
-const textoEmpresa = (e: Empresa) => `${e.apelido} ${e.razao_social} ${e.cnpj || ''}`
-
-function Empresas() {
-  const [empresas, setEmpresas] = useState<Empresa[]>([])
-  const [erro, setErro] = useState('')
-  useEffect(() => { api.empresas().then(setEmpresas).catch((err) => setErro(mensagem(err))) }, [])
-  const { busca, setBusca, filtradas } = useBusca(empresas, textoEmpresa)
-
-  const lojas = empresas.filter((e) => e.tipo === 'loja').length
-  const colunas: Coluna<Empresa>[] = [
-    { titulo: 'Empresa', render: (e) => <Titulo texto={e.apelido} sub={e.razao_social} /> },
-    { titulo: 'CNPJ', render: (e) => <Box component="span" sx={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{cnpjFormatado(e.cnpj)}</Box> },
-    { titulo: 'Tipo', render: (e) => <Selo texto={e.tipo === 'loja' ? 'Loja' : 'Holding'} tom={e.tipo === 'loja' ? 'neutro' : 'info'} /> },
-  ]
-
-  return (
-    <Stack spacing={2}>
-      <Resumos>
-        <Resumo rotulo="Empresas ativas" valor={String(empresas.length)} detalhe="no cadastro do Finance" />
-        <Resumo rotulo="Lojas" valor={String(lojas)} detalhe="operação BK" />
-        <Resumo rotulo="Holdings" valor={String(empresas.length - lojas)} detalhe="administrativo" />
-      </Resumos>
-      <Barra busca={busca} onBusca={setBusca} placeholder="Buscar empresa ou CNPJ" />
-      <Erro erro={erro} />
-      <TabelaConfig colunas={colunas} linhas={filtradas} chave={(e) => e.id} vazio="Nenhuma empresa encontrada." />
-    </Stack>
-  )
-}
-
-const textoConta = (c: Conta) => `${c.nome} ${c.apelido}`
-
-function Contas() {
-  const [contas, setContas] = useState<Conta[]>([])
-  const [erro, setErro] = useState('')
-  useEffect(() => { api.contas().then(setContas).catch((err) => setErro(mensagem(err))) }, [])
-  const { busca, setBusca, filtradas } = useBusca(contas, textoConta)
-
-  const dinheiro = contas.filter((c) => c.tipo === 'dinheiro').length
-  const colunas: Coluna<Conta>[] = [
-    { titulo: 'Conta', render: (c) => <Titulo texto={c.nome} /> },
-    { titulo: 'Empresa', render: (c) => c.apelido },
-    { titulo: 'Tipo', render: (c) => <Selo texto={c.tipo === 'dinheiro' ? 'Conta dinheiro' : 'Conta corrente'} tom={c.tipo === 'dinheiro' ? 'neutro' : 'info'} /> },
-  ]
-
-  return (
-    <Stack spacing={2}>
-      <Resumos>
-        <Resumo rotulo="Contas ativas" valor={String(contas.length)} detalhe="em todas as empresas" />
-        <Resumo rotulo="Contas correntes" valor={String(contas.length - dinheiro)} detalhe="Banco do Brasil e Itaú" />
-        <Resumo rotulo="Contas dinheiro" valor={String(dinheiro)} detalhe="caixa das lojas" />
-      </Resumos>
-      <Barra busca={busca} onBusca={setBusca} placeholder="Buscar conta ou empresa" />
-      <Erro erro={erro} />
-      <TabelaConfig colunas={colunas} linhas={filtradas} chave={(c) => c.id} vazio="Nenhuma conta encontrada." />
-    </Stack>
-  )
-}
-
-const textoPlano = (p: Plano) => p.nome
-const LIMITE_PLANO = 200
+const textoPlano = (p: PlanoCompleto) => p.nome
 
 function PlanoContas() {
-  const [plano, setPlano] = useState<Plano[]>([])
+  const [planos, setPlanos] = useState<PlanoCompleto[]>([])
+  const [filtro, setFiltro] = useState<Situacao>('ativos')
+  const [pagina, setPagina] = useState(0)
+  const [editando, setEditando] = useState<PlanoCompleto | 'novo' | null>(null)
   const [erro, setErro] = useState('')
-  useEffect(() => { api.plano().then(setPlano).catch((err) => setErro(mensagem(err))) }, [])
-  const { busca, setBusca, filtradas } = useBusca(plano, textoPlano)
-  const colunas: Coluna<Plano>[] = [{ titulo: 'Plano', render: (p) => <Titulo texto={p.nome} /> }]
+  const [aviso, setAviso] = useState('')
 
-  return (
-    <Stack spacing={2}>
-      <Resumos>
-        <Resumo rotulo="Planos a pagar" valor={String(plano.length)} detalhe="ativos para classificação" />
-        <Resumo rotulo="Na busca" valor={String(filtradas.length)} detalhe={busca ? `para “${busca}”` : 'sem filtro'} />
-      </Resumos>
-      <Barra busca={busca} onBusca={setBusca} placeholder="Buscar plano" />
-      <Erro erro={erro} />
-      <TabelaConfig
-        colunas={colunas}
-        linhas={filtradas.slice(0, LIMITE_PLANO)}
-        chave={(p) => p.id}
-        vazio="Nenhum plano encontrado."
-        rodape={filtradas.length > LIMITE_PLANO ? `Mostrando ${LIMITE_PLANO} de ${filtradas.length}. Refine a busca.` : undefined}
-      />
-    </Stack>
-  )
-}
+  const carregar = () => api.planosTodos().then(setPlanos).catch((err) => setErro(mensagem(err)))
+  useEffect(() => { carregar() }, [])
 
-function Fornecedores() {
-  const [busca, setBusca] = useState('')
-  const [fornecedores, setFornecedores] = useState<Fornecedor[]>([])
-  const [erro, setErro] = useState('')
+  const noFiltro = useMemo(() => porSituacao(planos, filtro, (p) => p.ativo), [planos, filtro])
+  const { busca, setBusca, filtradas } = useBusca(noFiltro, textoPlano)
+  useEffect(() => { setPagina(0) }, [busca, filtro])
 
-  useEffect(() => {
-    const termo = busca.trim()
-    if (termo.length < 2) { setFornecedores([]); return }
-    const t = setTimeout(() => {
-      api.fornecedores(termo, 100).then(setFornecedores).catch((err) => setErro(mensagem(err)))
-    }, 250)
-    return () => clearTimeout(t)
-  }, [busca])
+  const ativos = planos.filter((p) => p.ativo)
+  const semUso = ativos.filter((p) => !p.despesas && !p.fornecedores).length
 
-  const semPlano = fornecedores.filter((f) => !f.plano).length
-  const colunas: Coluna<Fornecedor>[] = [
-    { titulo: 'Fornecedor', render: (f) => <Titulo texto={f.nome} /> },
-    { titulo: 'CPF/CNPJ', render: (f) => <Box component="span" sx={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{cnpjFormatado(f.cpf_cnpj)}</Box> },
-    { titulo: 'Plano padrão', render: (f) => (f.plano ? f.plano : <Selo texto="Sem plano" tom="alerta" />) },
+  const colunas: Coluna<PlanoCompleto>[] = [
+    { titulo: 'Plano', render: (p) => <Titulo texto={p.nome} sub={p.natureza === 'fixa' ? 'Fixa' : p.natureza === 'variavel' ? 'Variável' : undefined} /> },
+    { titulo: 'Tipo', render: (p) => <Selo texto={p.tipo === 'a_pagar' ? 'A pagar' : 'A receber'} tom={p.tipo === 'a_pagar' ? 'neutro' : 'info'} /> },
+    {
+      titulo: 'Uso',
+      render: (p) => (
+        <Typography sx={{ fontSize: 13, color: p.despesas || p.fornecedores ? 'text.primary' : 'text.secondary' }}>
+          {p.despesas} {p.despesas === 1 ? 'despesa' : 'despesas'} · {p.fornecedores} {p.fornecedores === 1 ? 'fornecedor' : 'fornecedores'}
+        </Typography>
+      ),
+    },
+    { titulo: 'Situação', render: (p) => <Selo texto={p.ativo ? 'Ativo' : 'Inativo'} tom={p.ativo ? 'ok' : 'neutro'} /> },
+    { titulo: ' ', align: 'right', render: (p) => <Button size="small" onClick={(ev) => { ev.stopPropagation(); setEditando(p) }}>Editar</Button> },
   ]
 
   return (
     <Stack spacing={2}>
       <Resumos>
-        <Resumo rotulo="Encontrados" valor={String(fornecedores.length)} detalhe={busca.trim().length >= 2 ? 'na busca atual' : 'digite para buscar'} />
-        <Resumo rotulo="Com plano padrão" valor={String(fornecedores.length - semPlano)} detalhe="classificam sozinhos" />
-        <Resumo rotulo="Sem plano padrão" valor={String(semPlano)} detalhe="pedem classificação manual" />
+        <Resumo rotulo="Planos ativos" valor={String(ativos.length)} detalhe="disponíveis para classificar" />
+        <Resumo rotulo="Sem uso" valor={String(semUso)} detalhe="nenhuma despesa ou fornecedor" />
+        <Resumo rotulo="Inativos" valor={String(planos.length - ativos.length)} detalhe="guardados pelo histórico" />
       </Resumos>
-      <Barra busca={busca} onBusca={setBusca} placeholder="Buscar fornecedor ou CNPJ" />
+      <Barra busca={busca} onBusca={setBusca} placeholder="Buscar plano">
+        <FiltroSituacao valor={filtro} onMudar={setFiltro} />
+        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setEditando('novo')}>Novo plano</Button>
+      </Barra>
       <Erro erro={erro} />
       <TabelaConfig
         colunas={colunas}
-        linhas={fornecedores}
-        chave={(f) => f.id}
-        vazio={busca.trim().length < 2 ? 'Digite ao menos 2 letras para buscar.' : 'Nenhum fornecedor encontrado.'}
-        rodape={fornecedores.length >= 100 ? 'Mostrando os 100 primeiros. Refine a busca.' : undefined}
+        linhas={filtradas.slice(pagina * POR_PAGINA, (pagina + 1) * POR_PAGINA)}
+        chave={(p) => p.id}
+        vazio="Nenhum plano encontrado."
+        onLinha={setEditando}
+        paginacao={{ total: filtradas.length, pagina, por: POR_PAGINA, onPagina: setPagina }}
       />
+      {editando ? (
+        <FormPlano
+          key={editando === 'novo' ? 'novo' : editando.id}
+          plano={editando === 'novo' ? null : editando}
+          onFechar={() => setEditando(null)}
+          onSalvo={(texto) => { setEditando(null); setAviso(texto); carregar() }}
+        />
+      ) : null}
+      <Aviso texto={aviso} onFechar={() => setAviso('')} />
     </Stack>
+  )
+}
+
+function FormPlano({ plano, onFechar, onSalvo }: { plano: PlanoCompleto | null; onFechar: () => void; onSalvo: (texto: string) => void }) {
+  const [form, setForm] = useState({
+    nome: plano?.nome || '',
+    tipo: plano?.tipo || 'a_pagar',
+    natureza: plano?.natureza || '',
+    codigo_obrigacao: plano?.codigo_obrigacao || '',
+    codigo_provisao: plano?.codigo_provisao || '',
+    ativo: plano ? plano.ativo : true,
+  })
+  const [erro, setErro] = useState('')
+  const [salvando, setSalvando] = useState(false)
+  const [confirmando, setConfirmando] = useState(false)
+  const emUso = Boolean(plano && (plano.despesas || plano.fornecedores))
+
+  const salvar = async () => {
+    setSalvando(true)
+    setErro('')
+    try {
+      await api.salvarPlano(plano?.id || null, form)
+      onSalvo(plano ? `Plano “${form.nome}” atualizado.` : `Plano “${form.nome}” criado.`)
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : 'Não salvou')
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  const apagar = async () => {
+    if (!plano) return
+    if (!confirmando) { setConfirmando(true); return }
+    setSalvando(true)
+    try {
+      const r = await api.apagarPlano(plano.id)
+      onSalvo(r.inativado ? `Plano “${plano.nome}” inativado. Ele está em uso e fica no histórico.` : `Plano “${plano.nome}” apagado.`)
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : 'Não apagou')
+      setSalvando(false)
+    }
+  }
+
+  return (
+    <PainelLateral
+      aberto
+      titulo={plano ? plano.nome : 'Novo plano'}
+      subtitulo={plano ? `${plano.despesas} despesas · ${plano.fornecedores} fornecedores usam este plano` : 'Classificação para as despesas'}
+      onFechar={onFechar}
+      rodape={(
+        <>
+          {plano ? (
+            <Button color="error" disabled={salvando} onClick={apagar}>
+              {confirmando ? (emUso ? 'Confirmar inativação' : 'Confirmar exclusão') : (emUso ? 'Inativar' : 'Apagar')}
+            </Button>
+          ) : null}
+          <Box sx={{ flex: 1 }} />
+          <Button onClick={onFechar}>Cancelar</Button>
+          <Button variant="contained" disabled={salvando || !form.nome.trim()} onClick={salvar}>{salvando ? 'Salvando…' : 'Salvar'}</Button>
+        </>
+      )}
+    >
+      <Secao titulo="Plano">
+        <TextField label="Nome" size="small" value={form.nome} onChange={(ev) => setForm({ ...form, nome: ev.target.value })} autoFocus={!plano} />
+        <TextField select label="Tipo" size="small" value={form.tipo} onChange={(ev) => setForm({ ...form, tipo: ev.target.value as PlanoCompleto['tipo'] })}>
+          <MenuItem value="a_pagar">A pagar</MenuItem>
+          <MenuItem value="a_receber">A receber</MenuItem>
+        </TextField>
+        <TextField select label="Natureza" size="small" value={form.natureza} onChange={(ev) => setForm({ ...form, natureza: ev.target.value })}>
+          <MenuItem value="">Não informada</MenuItem>
+          <MenuItem value="fixa">Fixa</MenuItem>
+          <MenuItem value="variavel">Variável</MenuItem>
+        </TextField>
+      </Secao>
+      <Secao titulo="Contábil">
+        <TextField label="Código de obrigação" size="small" value={form.codigo_obrigacao} onChange={(ev) => setForm({ ...form, codigo_obrigacao: ev.target.value })} />
+        <TextField label="Código de provisão" size="small" value={form.codigo_provisao} onChange={(ev) => setForm({ ...form, codigo_provisao: ev.target.value })} />
+      </Secao>
+      <FormControlLabel
+        control={<Switch checked={form.ativo} onChange={(ev) => setForm({ ...form, ativo: ev.target.checked })} />}
+        label={<Typography sx={{ fontSize: 13 }}>Disponível para classificar despesas</Typography>}
+      />
+      {confirmando ? (
+        <Alert severity="warning">
+          {emUso
+            ? 'Este plano está em uso, então ele será inativado: some da classificação, mas continua nas despesas e fornecedores que já usam.'
+            : 'Este plano não tem uso e será apagado de vez.'}
+        </Alert>
+      ) : null}
+      {erro ? <Alert severity="error">{erro}</Alert> : null}
+    </PainelLateral>
   )
 }
 

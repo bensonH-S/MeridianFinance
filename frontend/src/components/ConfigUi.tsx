@@ -1,5 +1,9 @@
-import type { ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
+import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
+import Button from '@mui/material/Button'
+import MenuItem from '@mui/material/MenuItem'
+import Snackbar from '@mui/material/Snackbar'
 import Chip from '@mui/material/Chip'
 import Drawer from '@mui/material/Drawer'
 import IconButton from '@mui/material/IconButton'
@@ -9,6 +13,7 @@ import Table from '@mui/material/Table'
 import TableBody from '@mui/material/TableBody'
 import TableCell from '@mui/material/TableCell'
 import TableHead from '@mui/material/TableHead'
+import TablePagination from '@mui/material/TablePagination'
 import TableRow from '@mui/material/TableRow'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
@@ -88,13 +93,16 @@ export function Titulo({ texto, sub }: { texto: ReactNode; sub?: ReactNode }) {
   )
 }
 
-export function TabelaConfig<T>({ colunas, linhas, chave, vazio = 'Nada encontrado.', onLinha, rodape }: {
+export type Paginacao = { total: number; pagina: number; por: number; onPagina: (pagina: number) => void }
+
+export function TabelaConfig<T>({ colunas, linhas, chave, vazio = 'Nada encontrado.', onLinha, rodape, paginacao }: {
   colunas: Coluna<T>[]
   linhas: T[]
   chave: (linha: T) => string
   vazio?: string
   onLinha?: (linha: T) => void
   rodape?: ReactNode
+  paginacao?: Paginacao
 }) {
   return (
     <Paper variant="outlined" sx={{ overflow: 'auto' }}>
@@ -119,6 +127,19 @@ export function TabelaConfig<T>({ colunas, linhas, chave, vazio = 'Nada encontra
           ))}
         </TableBody>
       </Table>
+      {paginacao && paginacao.total > paginacao.por ? (
+        <TablePagination
+          component="div"
+          count={paginacao.total}
+          page={Math.min(paginacao.pagina, Math.max(Math.ceil(paginacao.total / paginacao.por) - 1, 0))}
+          rowsPerPage={paginacao.por}
+          rowsPerPageOptions={[paginacao.por]}
+          onPageChange={(_, pagina) => paginacao.onPagina(pagina)}
+          labelDisplayedRows={({ from, to, count }) => `${from}–${to} de ${count}`}
+          labelRowsPerPage="Por página"
+          sx={{ borderTop: '1px solid', borderColor: 'divider' }}
+        />
+      ) : null}
       {rodape ? (
         <Box sx={{ px: 2, py: 1.25, borderTop: '1px solid', borderColor: 'divider', fontSize: 12, color: 'text.secondary' }}>{rodape}</Box>
       ) : null}
@@ -160,4 +181,87 @@ export function PainelLateral({ aberto, titulo, subtitulo, onFechar, rodape, chi
       </Stack>
     </Drawer>
   )
+}
+
+export function useBusca<T>(linhas: T[], texto: (linha: T) => string) {
+  const [busca, setBusca] = useState('')
+  const filtradas = useMemo(() => {
+    const termo = busca.trim().toLowerCase()
+    if (!termo) return linhas
+    const numeros = termo.replace(/\D/g, '')
+    return linhas.filter((l) => {
+      const alvo = texto(l).toLowerCase()
+      return alvo.includes(termo) || (numeros.length >= 3 && alvo.replace(/\D/g, '').includes(numeros))
+    })
+  }, [linhas, busca, texto])
+  return { busca, setBusca, filtradas }
+}
+
+export function mensagem(err: unknown, padrao = 'Não carregou') {
+  return err instanceof Error ? err.message : padrao
+}
+
+export function Erro({ erro }: { erro: string }) {
+  return erro ? <Alert severity="error">{erro}</Alert> : null
+}
+
+export function Aviso({ texto, onFechar }: { texto: string; onFechar: () => void }) {
+  return (
+    <Snackbar open={!!texto} autoHideDuration={3600} onClose={onFechar} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+      <Alert severity="success" variant="filled" onClose={onFechar} sx={{ bgcolor: '#1F8A4C' }}>{texto}</Alert>
+    </Snackbar>
+  )
+}
+
+export type Situacao = 'ativos' | 'inativos' | 'todos'
+
+export function FiltroSituacao({ valor, onMudar }: { valor: Situacao; onMudar: (valor: Situacao) => void }) {
+  return (
+    <TextField select size="small" value={valor} onChange={(ev) => onMudar(ev.target.value as Situacao)} sx={{ minWidth: 150, bgcolor: 'background.paper' }}>
+      <MenuItem value="ativos">Ativos</MenuItem>
+      <MenuItem value="inativos">Inativos</MenuItem>
+      <MenuItem value="todos">Todos</MenuItem>
+    </TextField>
+  )
+}
+
+export function porSituacao<T>(linhas: T[], situacao: Situacao, ativo: (linha: T) => boolean) {
+  return linhas.filter((l) => situacao === 'todos' || (situacao === 'ativos' ? ativo(l) : !ativo(l)))
+}
+
+export function AcoesForm({ existe, emUso, salvando, podeSalvar, onSalvar, onExcluir, onFechar }: {
+  existe: boolean
+  emUso: boolean
+  salvando: boolean
+  podeSalvar: boolean
+  onSalvar: () => void
+  onExcluir: () => void
+  onFechar: () => void
+}) {
+  const [confirmando, setConfirmando] = useState(false)
+  return (
+    <Stack spacing={1.5} sx={{ flex: 1 }}>
+      {confirmando ? (
+        <Alert severity="warning" onClose={() => setConfirmando(false)}>
+          {emUso
+            ? 'Está em uso, então vai ser inativado: sai das listas e da escolha em novos lançamentos, mas continua no histórico.'
+            : 'Não tem uso e vai ser excluído de vez.'}
+        </Alert>
+      ) : null}
+      <Stack direction="row" spacing={1}>
+        {existe ? (
+          <Button color="error" disabled={salvando} onClick={() => (confirmando ? onExcluir() : setConfirmando(true))}>
+            {confirmando ? (emUso ? 'Confirmar inativação' : 'Confirmar exclusão') : (emUso ? 'Inativar' : 'Excluir')}
+          </Button>
+        ) : null}
+        <Box sx={{ flex: 1 }} />
+        <Button onClick={onFechar}>Cancelar</Button>
+        <Button variant="contained" disabled={salvando || !podeSalvar} onClick={onSalvar}>{salvando ? 'Salvando…' : 'Salvar'}</Button>
+      </Stack>
+    </Stack>
+  )
+}
+
+export function textoRemocao(nome: string, r: { inativado?: boolean }) {
+  return r.inativado ? `“${nome}” inativado. Está em uso e fica no histórico.` : `“${nome}” excluído.`
 }
