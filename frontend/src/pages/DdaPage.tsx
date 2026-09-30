@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
@@ -39,6 +39,11 @@ export function DdaPage() {
   const [subindo, setSubindo] = useState(false)
   const [erro, setErro] = useState('')
   const [aviso, setAviso] = useState('')
+  const [sfg, setSfg] = useState('')
+
+  useEffect(() => {
+    api.sfgDda().then((estado) => setSfg(estado.mensagem)).catch(() => setSfg(''))
+  }, [])
 
   const prontas = linhas.filter((linha, indice) => linha.pronto && marcadas[indice])
 
@@ -54,7 +59,7 @@ export function DdaPage() {
     } catch (err) {
       setLinhas([])
       setMarcadas([])
-      setErro(err instanceof Error ? err.message : 'Não leu a planilha')
+      setErro(err instanceof Error ? err.message : 'Não leu o arquivo')
     } finally {
       setLendo(false)
       if (input.current) input.current.value = ''
@@ -83,12 +88,12 @@ export function DdaPage() {
     <Stack spacing={2} sx={{ height: '100%', minHeight: 0 }}>
       <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} sx={{ alignItems: { md: 'center' } }}>
         <Typography sx={{ color: 'text.secondary', fontSize: 14, flex: 1 }}>
-          Exporte o DDA no Itaú ou no Banco do Brasil e solte a planilha aqui. Entram os boletos em aberto no CNPJ da empresa.
+          O Finance puxa o retorno de DDA na VAN do Itaú sozinho. {sfg || 'Aguardando a coleta.'}
         </Typography>
         <Button variant="contained" color="secondary" startIcon={<UploadFileOutlinedIcon />} disabled={lendo} onClick={() => input.current?.click()}>
-          {lendo ? 'Lendo…' : 'Escolher planilha'}
+          {lendo ? 'Lendo…' : 'Escolher arquivo'}
         </Button>
-        <input ref={input} hidden type="file" accept=".xlsx,.xls,.csv" onChange={(ev) => escolher(ev.target.files?.[0])} />
+        <input ref={input} hidden type="file" accept=".xlsx,.xls,.csv,.ret,.txt,.rem" onChange={(ev) => escolher(ev.target.files?.[0])} />
       </Stack>
 
       {erro && <Alert severity="error">{erro}</Alert>}

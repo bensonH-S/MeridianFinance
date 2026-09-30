@@ -1,7 +1,7 @@
-export type Empresa = { id: string; apelido: string; razao_social: string; tipo: 'loja' | 'holding' }
+export type Empresa = { id: string; apelido: string; razao_social: string; tipo: 'loja' | 'holding'; cnpj?: string | null }
 export type Conta = { id: string; empresa_id: string; nome: string; tipo: string; apelido: string }
 export type Plano = { id: string; nome: string }
-export type Fornecedor = { id: string; nome: string; plano_conta_id: string | null; plano: string | null }
+export type Fornecedor = { id: string; nome: string; cpf_cnpj?: string | null; plano_conta_id: string | null; plano: string | null }
 export type Despesa = {
   id: string
   descricao: string
@@ -68,6 +68,25 @@ export type LojaVenda = {
   venda_liquida: number
 }
 
+export type AcessoBb = {
+  empresa_id: string
+  empresa: string
+  razao_social: string
+  cnpj: string | null
+  cadastrada: boolean
+  ambiente: 'homologacao' | 'producao'
+  client_id: string
+  app_key: string
+  segredo_definido: boolean
+  certificado_definido: boolean
+  chave_definida: boolean
+  ativo: boolean
+  pronta: boolean
+  ultima_coleta: string | null
+  ultimo_ok: boolean | null
+  ultima_mensagem: string | null
+}
+
 export type ConfigBkoffice = {
   usuario: string
   api: string
@@ -106,7 +125,7 @@ export const api = {
     const url = URL.createObjectURL(await res.blob())
     window.open(url, '_blank', 'noopener')
   },
-  fornecedores: (q: string) => get<Fornecedor[]>(`${apiRoot}/fornecedores?q=${encodeURIComponent(q)}`),
+  fornecedores: (q: string, limite?: number) => get<Fornecedor[]>(`${apiRoot}/fornecedores?q=${encodeURIComponent(q)}${limite ? `&limite=${limite}` : ''}`),
   criarDespesa: async (body: Record<string, unknown>) => {
     const res = await fetch(`${apiRoot}/despesas`, {
       method: 'POST',
@@ -123,6 +142,7 @@ export const api = {
     if (!res.ok) throw new Error(data.erro || 'Não excluiu')
     return data as { id: string }
   },
+  sfgDda: () => get<{ ok: boolean; mensagem: string; criadas: number; em: string | null }>(`${apiRoot}/dda/sfg`),
   previaDda: async (arquivo: string) => {
     const res = await fetch(`${apiRoot}/dda/previa`, {
       method: 'POST',
@@ -144,6 +164,25 @@ export const api = {
     const data = await res.json()
     if (!res.ok) throw new Error(data.erro || 'Não salvou')
     return data as ConfigBkoffice
+  },
+  acessosBb: () => get<AcessoBb[]>(`${apiRoot}/config/bb`),
+  salvarAcessoBb: async (empresaId: string, body: Record<string, unknown>) => {
+    const res = await fetch(`${apiRoot}/config/bb/${empresaId}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.erro || 'Não salvou')
+    return data as AcessoBb
+  },
+  removerAcessoBb: async (empresaId: string) => {
+    const res = await fetch(`${apiRoot}/config/bb/${empresaId}`, { method: 'DELETE' })
+    if (!res.ok) throw new Error('Não removeu')
+  },
+  coletarBb: async () => {
+    const res = await fetch(`${apiRoot}/config/bb/coletar`, { method: 'POST' })
+    if (!res.ok) throw new Error('Não iniciou a coleta')
   },
   importarDda: async (linhas: LinhaDda[]) => {
     const res = await fetch(`${apiRoot}/dda/importar`, {

@@ -10,6 +10,7 @@
   "dependencies": {
     "nfe-danfe-pdf": "^1.0.3",
     "pg": "^8.13.1",
+    "ssh2-sftp-client": "^12.1.1",
     "xlsx": "^0.18.5"
   }
 }

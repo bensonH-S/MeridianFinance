@@ -4,7 +4,18 @@ import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import pg from 'pg'
-import { acharFornecedor, classificar, lerPlanilha } from './lib/dda.mjs'
+import { acharFornecedor, classificar, lerArquivoDda, lerCnab240 } from './lib/dda.mjs'
+import { baixarRetornos, configSfg } from './lib/itauSfg.mjs'
+import {
+  configPronta,
+  credenciaisAtivasBb,
+  garantirSchemaBb,
+  listarAcessosBb,
+  listarBoletosBb,
+  registrarColetaBb,
+  removerAcessoBb,
+  salvarAcessoBb,
+} from './lib/bbDda.mjs'
 import { gerarDanfe } from './lib/danfe.mjs'
 import { baixarBoletoDaDespesa, baixarNotaDaDespesa } from './lib/boletoEsupri.mjs'
 import { cruzarNotas } from './lib/nfEntrada.mjs'
@@ -64,6 +75,14 @@ const FORMAS = new Set(['dinheiro', 'online', 'boleto', 'guia', 'folha', 'cadast
 
 const sessao = { nome: 'Felipe', papel: 'Autoriza' }
 let coletaVendas = null
+let coletaSfg = null
+let coletaBb = null
+let estadoSfg = {
+  ok: false,
+  mensagem: 'A coleta da VAN do Itaú ainda não rodou.',
+  criadas: 0,
+  em: null,
+}
 
 function versaoApp() {
   if (process.env.APP_VERSION) return process.env.APP_VERSION
@@ -113,6 +132,55 @@ async function contextoDda() {
     empresas: empresas.rows,
     fornecedores: fornecedores.rows,
     existentes: existentes.rows.map((linha) => `${linha.empresa_origem_id}|${linha.documento_ref}`),
+  }
+}
+
+async function lancarDda(selecionadas) {
+  const contexto = await contextoDda()
+  const prontas = classificar(selecionadas, contexto).filter((linha) => linha.pronto)
+  let criadas = 0
+  for (const linha of prontas) {
+    const status = linha.fornecedor_id ? 'classificada' : 'rascunho'
+    await pool.query(`
+      insert into despesas (
+        descricao, fornecedor_id, empresa_origem_id, plano_conta_id,
+        documento_ref, numero_nf, cnpj_cedente, competencia, vencimento, valor, forma_pagamento, dados_pagamento, status
+      ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'boleto',$11,$12)
+    `, [
+      '',
+      linha.fornecedor_id,
+      linha.empresa_id,
+      linha.plano_conta_id,
+      linha.documento_ref,
+      linha.documento || null,
+      linha.cnpj_cedente || null,
+      linha.competencia,
+      linha.vencimento,
+      linha.valor,
+      linha.codigo ? String(linha.codigo).trim() : null,
+      status,
+    ])
+    criadas += 1
+  }
+  return { criadas, ignoradas: selecionadas.length - criadas }
+}
+
+function ledgerSfg() {
+  const dir = path.join(root, 'data', 'sfg')
+  const arquivo = path.join(dir, 'ledger.json')
+  fs.mkdirSync(dir, { recursive: true })
+  let itens = []
+  try {
+    itens = JSON.parse(fs.readFileSync(arquivo, 'utf8'))
+  } catch {
+    itens = []
+  }
+  return {
+    itens,
+    recebidos: path.join(dir, 'recebidos'),
+    gravar() {
+      fs.writeFileSync(arquivo, JSON.stringify(itens, null, 2))
+    },
   }
 }
 
@@ -286,7 +354,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'GET' && url.pathname === '/api/empresas') {
       const { rows } = await pool.query(`
-        select id, apelido, razao_social, tipo from empresas where ativo order by tipo, apelido
+        select id, apelido, razao_social, tipo, cnpj from empresas where ativo order by tipo, apelido
       `)
       return send(res, 200, JSON.stringify(rows))
     }
@@ -310,13 +378,13 @@ const server = http.createServer(async (req, res) => {
       const q = (url.searchParams.get('q') || '').trim()
       if (q.length < 2) return send(res, 200, '[]')
       const { rows } = await pool.query(`
-        select f.id, f.nome, f.plano_conta_id, p.nome as plano
+        select f.id, f.nome, f.cpf_cnpj, f.plano_conta_id, p.nome as plano
         from fornecedores f
         left join plano_contas p on p.id = f.plano_conta_id
-        where f.nome ilike $1
+        where f.nome ilike $1 or regexp_replace(coalesce(f.cpf_cnpj, ''), '\\D', '', 'g') like $2
         order by nome
-        limit 12
-      `, [`%${q}%`])
+        limit $3
+      `, [`%${q}%`, `%${q.replace(/\D/g, '') || '-'}%`, Math.min(Number(url.searchParams.get('limite')) || 12, 200)])
       return send(res, 200, JSON.stringify(rows))
     }
     if (req.method === 'POST' && url.pathname === '/api/despesas') {
@@ -440,42 +508,40 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req)
       const contexto = await contextoDda()
       if (url.pathname === '/api/dda/previa') {
-        if (!body.arquivo) return send(res, 400, JSON.stringify({ erro: 'Envie a planilha de DDA.' }))
+        if (!body.arquivo) return send(res, 400, JSON.stringify({ erro: 'Envie a planilha ou o arquivo retorno de DDA.' }))
         let linhas
         try {
-          linhas = classificar(lerPlanilha(Buffer.from(body.arquivo, 'base64')), contexto)
+          linhas = classificar(lerArquivoDda(Buffer.from(body.arquivo, 'base64')), contexto)
         } catch (err) {
-          return send(res, 400, JSON.stringify({ erro: err.message || 'Planilha inválida.' }))
+          return send(res, 400, JSON.stringify({ erro: err.message || 'Arquivo inválido.' }))
         }
         return send(res, 200, JSON.stringify({ linhas }))
       }
       const selecionadas = Array.isArray(body.linhas) ? body.linhas : []
-      const prontas = classificar(selecionadas, contexto).filter((linha) => linha.pronto)
-      let criadas = 0
-      for (const linha of prontas) {
-        const status = linha.fornecedor_id ? 'classificada' : 'rascunho'
-        await pool.query(`
-          insert into despesas (
-            descricao, fornecedor_id, empresa_origem_id, plano_conta_id,
-            documento_ref, numero_nf, cnpj_cedente, competencia, vencimento, valor, forma_pagamento, dados_pagamento, status
-          ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'boleto',$11,$12)
-        `, [
-          '',
-          linha.fornecedor_id,
-          linha.empresa_id,
-          linha.plano_conta_id,
-          linha.documento_ref,
-          linha.documento || null,
-          linha.cnpj_cedente || null,
-          linha.competencia,
-          linha.vencimento,
-          linha.valor,
-          linha.codigo ? String(linha.codigo).trim() : null,
-          status,
-        ])
-        criadas += 1
+      return send(res, 201, JSON.stringify(await lancarDda(selecionadas)))
+    }
+    if (req.method === 'GET' && url.pathname === '/api/dda/sfg') {
+      return send(res, 200, JSON.stringify(estadoSfg))
+    }
+    if (req.method === 'GET' && url.pathname === '/api/config/bb') {
+      return send(res, 200, JSON.stringify(await listarAcessosBb(pool)))
+    }
+    if (/^\/api\/config\/bb\/[^/]+$/.test(url.pathname) && (req.method === 'PUT' || req.method === 'DELETE')) {
+      const empresaId = url.pathname.split('/').pop()
+      if (req.method === 'DELETE') {
+        await removerAcessoBb(pool, empresaId)
+        return send(res, 200, JSON.stringify({ empresa_id: empresaId }))
       }
-      return send(res, 201, JSON.stringify({ criadas, ignoradas: selecionadas.length - criadas }))
+      const body = await readBody(req)
+      try {
+        return send(res, 200, JSON.stringify(await salvarAcessoBb(pool, empresaId, body)))
+      } catch (err) {
+        return send(res, err.status || 400, JSON.stringify({ erro: err.message || 'Não salvou o acesso.' }))
+      }
+    }
+    if (req.method === 'POST' && url.pathname === '/api/config/bb/coletar') {
+      cicloBb().catch((err) => console.error(`[bb] ${err.message}`))
+      return send(res, 202, JSON.stringify({ ok: true }))
     }
     if (req.method === 'GET' && !url.pathname.startsWith('/api')) {
       const dist = path.join(root, 'frontend', 'dist')
@@ -504,6 +570,126 @@ const server = http.createServer(async (req, res) => {
 })
 
 const intervaloVendas = Number(process.env.VENDAS_SYNC_MS || 180000)
+const intervaloSfg = Number(process.env.ITAU_SFG_MS || 900000)
+const intervaloBb = Number(process.env.BB_DDA_MS || 900000)
+let avisouSfg = false
+let avisouBb = false
+let estadoBb = {
+  ok: false,
+  mensagem: 'A coleta do Banco do Brasil ainda não rodou.',
+  criadas: 0,
+  em: null,
+}
+
+async function cicloSfg() {
+  if (coletaSfg) return
+  const config = configSfg(env)
+  if (!config) {
+    estadoSfg = {
+      ok: false,
+      mensagem: 'Caixa postal do Itaú ainda não está neste servidor.',
+      criadas: 0,
+      em: new Date().toISOString(),
+    }
+    if (!avisouSfg) {
+      console.log('[sfg] sem host, usuário e chave. A coleta espera a caixa postal.')
+      avisouSfg = true
+    }
+    return
+  }
+  const livro = ledgerSfg()
+  coletaSfg = baixarRetornos(config, livro.recebidos, new Set(livro.itens.map((item) => item.remoto)))
+  try {
+    const baixados = await coletaSfg
+    for (const item of baixados) {
+      livro.itens.push({ remoto: item.remoto, local: item.local, situacao: 'pendente', criadas: 0 })
+    }
+    if (baixados.length) livro.gravar()
+    let criadas = 0
+    for (const item of livro.itens) {
+      if (item.situacao !== 'pendente') continue
+      try {
+        const resultado = await lancarDda(lerCnab240(fs.readFileSync(item.local)))
+        item.situacao = 'importado'
+        item.criadas = resultado.criadas
+        criadas += resultado.criadas
+      } catch (err) {
+        if (/sem boleto de DDA|CNAB 240 inválido/.test(err.message || '')) {
+          item.situacao = 'ignorado'
+          continue
+        }
+        throw err
+      }
+    }
+    livro.gravar()
+    const mensagem = baixados.length
+      ? `${baixados.length} arquivo(s) da VAN, ${criadas} boleto(s) novo(s).`
+      : 'VAN consultada. Nenhum retorno novo.'
+    estadoSfg = { ok: true, mensagem, criadas, em: new Date().toISOString() }
+    console.log(`[sfg] ${mensagem}`)
+  } catch (err) {
+    const mensagem = err.message || 'Falha ao puxar a VAN do Itaú'
+    estadoSfg = { ok: false, mensagem, criadas: 0, em: new Date().toISOString() }
+    console.error(`[sfg] ${mensagem}`)
+  } finally {
+    coletaSfg = null
+  }
+}
+
+async function coletarEmpresasBb() {
+  const credenciais = (await credenciaisAtivasBb(pool)).filter(configPronta)
+  if (!credenciais.length) {
+    estadoBb = {
+      ok: false,
+      mensagem: 'Nenhuma empresa com acesso do Banco do Brasil em Configuração.',
+      criadas: 0,
+      em: new Date().toISOString(),
+    }
+    if (!avisouBb) {
+      console.log('[bb] nenhuma empresa com acesso completo. A coleta espera a configuração.')
+      avisouBb = true
+    }
+    return
+  }
+  let criadas = 0
+  let falhas = 0
+  for (const credencial of credenciais) {
+    try {
+      const linhas = await listarBoletosBb(credencial)
+      const resultado = await lancarDda(linhas)
+      criadas += resultado.criadas
+      const mensagem = linhas.length
+        ? `${linhas.length} boleto(s), ${resultado.criadas} novo(s).`
+        : 'Nenhum boleto a pagar no período.'
+      await registrarColetaBb(pool, credencial.empresa_id, true, mensagem)
+      console.log(`[bb] ${credencial.empresa}: ${mensagem}`)
+    } catch (err) {
+      falhas += 1
+      const mensagem = err.message || 'Falha ao consultar o DDA do Banco do Brasil'
+      await registrarColetaBb(pool, credencial.empresa_id, false, mensagem)
+      console.error(`[bb] ${credencial.empresa}: ${mensagem}`)
+    }
+  }
+  estadoBb = {
+    ok: falhas === 0,
+    mensagem: `${credenciais.length} empresa(s) consultada(s), ${criadas} boleto(s) novo(s)${falhas ? `, ${falhas} com erro` : ''}.`,
+    criadas,
+    em: new Date().toISOString(),
+  }
+}
+
+async function cicloBb() {
+  if (coletaBb) return coletaBb
+  coletaBb = coletarEmpresasBb()
+  try {
+    await coletaBb
+  } catch (err) {
+    estadoBb = { ok: false, mensagem: err.message || 'Falha na coleta do Banco do Brasil', criadas: 0, em: new Date().toISOString() }
+    console.error(`[bb] ${estadoBb.mensagem}`)
+  } finally {
+    coletaBb = null
+  }
+}
 
 async function cicloVendas() {
   if (coletaVendas) return
@@ -527,6 +713,17 @@ server.listen(port, '127.0.0.1', () => {
     console.log(`[vendas] coleta automática a cada ${Math.round(intervaloVendas / 1000)}s`)
     setTimeout(cicloVendas, 8000)
     setInterval(cicloVendas, intervaloVendas)
+  }
+  if (intervaloSfg >= 60000) {
+    console.log(`[sfg] coleta automática a cada ${Math.round(intervaloSfg / 1000)}s`)
+    setTimeout(cicloSfg, 12000)
+    setInterval(cicloSfg, intervaloSfg)
+  }
+  garantirSchemaBb(pool).catch((err) => console.error(`[bb] ${err.message}`))
+  if (intervaloBb >= 60000) {
+    console.log(`[bb] coleta automática a cada ${Math.round(intervaloBb / 1000)}s`)
+    setTimeout(cicloBb, 15000)
+    setInterval(cicloBb, intervaloBb)
   }
   pool.query(`
     alter table despesas add column if not exists dados_pagamento text;
