@@ -17,7 +17,7 @@ import {
   salvarAcessoBb,
 } from './lib/bbDda.mjs'
 import { removerCadastro, salvarCadastro, usoDe } from './lib/cadastros.mjs'
-import { garantirSchemaCaixa, mesFechamentos, salvarFechamento } from './lib/fechamentoCaixa.mjs'
+import { garantirSchemaCaixa, lerComprovante, mesFechamentos, receberIngestao, salvarFechamento } from './lib/fechamentoCaixa.mjs'
 import { gerarDanfe } from './lib/danfe.mjs'
 import { baixarBoletoDaDespesa, baixarNotaDaDespesa } from './lib/boletoEsupri.mjs'
 import { cruzarNotas } from './lib/nfEntrada.mjs'
@@ -607,12 +607,40 @@ const server = http.createServer(async (req, res) => {
         return send(res, err.status || 400, JSON.stringify({ erro: err.message || 'Não carregou o fechamento.' }))
       }
     }
+    if (req.method === 'GET' && /^\/api\/caixa\/lancamentos\/[^/]+\/comprovante$/.test(url.pathname)) {
+      try {
+        const arquivo = await lerComprovante(pool, url.pathname.split('/')[4])
+        res.writeHead(200, {
+          'content-type': arquivo.mime,
+          'content-disposition': `inline; filename="${arquivo.nome}"`,
+          'cache-control': 'no-store',
+        })
+        return res.end(arquivo.buffer)
+      } catch (err) {
+        return send(res, err.status || 404, JSON.stringify({ erro: err.message || 'Não abriu o comprovante.' }))
+      }
+    }
     if (req.method === 'PUT' && url.pathname === '/api/caixa') {
       const body = await readBody(req)
       try {
         return send(res, 200, JSON.stringify(await salvarFechamento(pool, body)))
       } catch (err) {
         return send(res, err.status || 400, JSON.stringify({ erro: err.message || 'Não salvou o fechamento.' }))
+      }
+    }
+    if (req.method === 'POST' && url.pathname === '/api/caixa/ingest') {
+      const body = await readBody(req)
+      const auth = String(req.headers.authorization || '')
+      const token = auth.toLowerCase().startsWith('bearer ') ? auth.slice(7).trim() : ''
+      try {
+        return send(res, 200, JSON.stringify(await receberIngestao(
+          pool,
+          body,
+          env.CAIXA_INGEST_TOKEN || process.env.CAIXA_INGEST_TOKEN,
+          token,
+        )))
+      } catch (err) {
+        return send(res, err.status || 400, JSON.stringify({ erro: err.message || 'Não recebeu o caixa da loja.' }))
       }
     }
     if (req.method === 'POST' && url.pathname === '/api/vendas/sync') {

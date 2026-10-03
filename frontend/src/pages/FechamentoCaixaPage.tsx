@@ -1,16 +1,39 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import Alert from '@mui/material/Alert'
+import Autocomplete from '@mui/material/Autocomplete'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Chip from '@mui/material/Chip'
-import Drawer from '@mui/material/Drawer'
+import Dialog from '@mui/material/Dialog'
+import DialogActions from '@mui/material/DialogActions'
+import DialogContent from '@mui/material/DialogContent'
+import DialogTitle from '@mui/material/DialogTitle'
+import IconButton from '@mui/material/IconButton'
 import MenuItem from '@mui/material/MenuItem'
 import Paper from '@mui/material/Paper'
 import Snackbar from '@mui/material/Snackbar'
 import Stack from '@mui/material/Stack'
+import Table from '@mui/material/Table'
+import TableBody from '@mui/material/TableBody'
+import TableCell from '@mui/material/TableCell'
+import TableHead from '@mui/material/TableHead'
+import TableRow from '@mui/material/TableRow'
 import TextField from '@mui/material/TextField'
+import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
-import { api, brl, type Empresa, type FechamentoDia, type MesFechamento } from '../api'
+import Collapse from '@mui/material/Collapse'
+import AddIcon from '@mui/icons-material/Add'
+import AttachFileOutlinedIcon from '@mui/icons-material/AttachFileOutlined'
+import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined'
+import CloseIcon from '@mui/icons-material/Close'
+import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined'
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown'
+import PointOfSaleOutlinedIcon from '@mui/icons-material/PointOfSaleOutlined'
+import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined'
+import TrendingUpIcon from '@mui/icons-material/TrendingUp'
+import InsertDriveFileOutlinedIcon from '@mui/icons-material/InsertDriveFileOutlined'
+import { api, brl, type Empresa, type FechamentoDia, type Fornecedor, type LancamentoCaixa, type MesFechamento } from '../api'
 import { usePrefs } from '../prefs'
 
 function mesAtual() {
@@ -30,32 +53,25 @@ function hojeIso() {
   }).format(new Date())
 }
 
-function dinheiroTexto(valor: number) {
-  return valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-
-function lerDinheiro(texto: string) {
-  const limpo = texto.replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.')
-  const n = Number(limpo)
-  return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0
-}
-
 const TOM_CLARO: Record<string, { color: string; border: string; bg: string }> = {
   rascunho: { color: '#DC2626', border: 'rgba(220,38,38,0.55)', bg: 'rgba(220,38,38,0.06)' },
   conferido: { color: '#1D4ED8', border: 'rgba(59,130,246,0.45)', bg: 'rgba(59,130,246,0.08)' },
   fechado: { color: '#047857', border: 'rgba(16,185,129,0.45)', bg: 'rgba(16,185,129,0.08)' },
+  aguardando: { color: '#CA8A04', border: 'rgba(234,179,8,0.5)', bg: 'rgba(234,179,8,0.1)' },
 }
 
 const TOM_ESCURO: Record<string, { color: string; border: string; bg: string }> = {
   rascunho: { color: '#FCA5A5', border: 'rgba(248,113,113,0.55)', bg: 'rgba(248,113,113,0.12)' },
   conferido: { color: '#93C5FD', border: 'rgba(96,165,250,0.5)', bg: 'rgba(96,165,250,0.14)' },
   fechado: { color: '#6EE7B7', border: 'rgba(52,211,153,0.45)', bg: 'rgba(52,211,153,0.14)' },
+  aguardando: { color: '#FDE68A', border: 'rgba(250,204,21,0.5)', bg: 'rgba(250,204,21,0.12)' },
 }
 
 const ROTULO: Record<string, [string, string]> = {
-  rascunho: ['Pendente', 'Pending'],
-  conferido: ['Conferido', 'Checked'],
+  rascunho: ['Sem dados', 'No data'],
+  conferido: ['Lançar despesa', 'Post expense'],
   fechado: ['Fechado', 'Closed'],
+  aguardando: ['Aguardando', 'Waiting'],
 }
 
 function totalDia(d: FechamentoDia) {
@@ -68,6 +84,32 @@ function gate(d: FechamentoDia) {
 
 function cartoes(d: FechamentoDia) {
   return Math.round((d.debito + d.credito + d.cart_digital) * 100) / 100
+}
+
+function caixaGaveta(d: FechamentoDia) {
+  return Math.round((d.dinheiro - (d.despesas_caixa || 0) - (d.depositos_caixa || 0)) * 100) / 100
+}
+
+function chegouDoPdv(d: FechamentoDia) {
+  return totalDia(d) > 0
+}
+
+function dinheiroTexto(valor: number) {
+  return valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function mascararMoeda(texto: string) {
+  const soDigitosEVirgula = texto.replace(/[^\d,]/g, '')
+  const [reais = '', ...resto] = soDigitosEVirgula.split(',')
+  const centavos = resto.join('').slice(0, 2)
+  if (soDigitosEVirgula.includes(',')) return `${reais},${centavos}`
+  return reais
+}
+
+function lerDinheiro(texto: string) {
+  const limpo = texto.replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.')
+  const n = Number(limpo)
+  return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0
 }
 
 function gradeMes(mes: string, dias: FechamentoDia[], empresaId: string, empresa: string, bk: string | null) {
@@ -96,6 +138,8 @@ function gradeMes(mes: string, dias: FechamentoDia[], empresaId: string, empresa
       rappi: 0,
       food99: 0,
       despesas_caixa: 0,
+      depositos_caixa: 0,
+      lancamentos: [],
       observacao: '',
       status: 'rascunho',
       atualizado_em: null,
@@ -146,7 +190,7 @@ export function FechamentoCaixaPage() {
   useEffect(() => {
     api.empresas().then((lista) => {
       setEmpresas(lista)
-      const loja = lista.find((e) => e.tipo === 'loja')
+      const loja = lista.find((e) => String(e.bk_number || '').replace(/\D/g, '') === '23531') || lista.find((e) => e.tipo === 'loja')
       if (loja) setEmpresaId((atual) => atual || loja.id)
     }).catch((err: unknown) => setErro(err instanceof Error ? err.message : t('Não carregou as lojas', 'Could not load stores')))
   }, [])
@@ -159,7 +203,10 @@ export function FechamentoCaixaPage() {
         setErro('')
         setSelecionado((atual) => {
           if (!atual) {
-            const doDia = dados.dias.find((d) => d.data === hoje) || dados.dias[0] || null
+            const doDia = dados.dias.find((d) => d.data === hoje)
+              || dados.dias.find((d) => chegouDoPdv(d))
+              || dados.dias[0]
+              || null
             return doDia
           }
           return dados.dias.find((d) => d.data === atual.data) || atual
@@ -176,20 +223,24 @@ export function FechamentoCaixaPage() {
     () => gradeMes(mes, dias, empresaId, lojaAtual?.apelido || lojaAtual?.razao_social || '', mesDados?.empresa.bk_number ?? null),
     [mes, dias, empresaId, lojaAtual, mesDados],
   )
-  const resumo = mesDados?.resumo
   const tomMap = escuro ? TOM_ESCURO : TOM_CLARO
   const diasSemana = idioma === 'en'
     ? ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
     : ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
   const diaPainel = selecionado || semanas.flat().find((d) => d?.data === hoje) || null
-  const pendentes = Math.max(0, (resumo?.dias_com_movimento ?? 0) - (resumo?.conferidos ?? 0) - (resumo?.fechados ?? 0))
+  const faltando = semanas.flat().filter((d) => d && d.data < hoje && !chegouDoPdv(d) && d.status !== 'fechado').length
+  const fechados = (mesDados?.dias ?? []).filter((d) => d.status === 'fechado').length
   const dataPainel = diaPainel
     ? new Date(`${diaPainel.data}T12:00:00`).toLocaleDateString(idioma === 'en' ? 'en-US' : 'pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
     : ''
 
-  const abrirDia = (dia: FechamentoDia) => {
-    setSelecionado(dia)
+  const rotuloDia = (dia: FechamentoDia) => {
+    if (dia.status === 'fechado' && dia.id) return 'fechado'
+    if (chegouDoPdv(dia)) return 'conferido'
+    if (dia.data === hoje) return 'aguardando'
+    if (dia.data < hoje) return 'rascunho'
+    return ''
   }
 
   return (
@@ -206,14 +257,6 @@ export function FechamentoCaixaPage() {
           {lojas.map((e) => <MenuItem key={e.id} value={e.id}>{e.apelido || e.razao_social}</MenuItem>)}
         </TextField>
         <TextField size="small" label={t('Mês', 'Month')} type="month" value={mes} onChange={(ev) => setMes(ev.target.value)} slotProps={{ inputLabel: { shrink: true } }} sx={{ width: 170, bgcolor: 'background.paper' }} />
-        <Box sx={{ flex: 1 }} />
-        <Button
-          variant="contained"
-          disabled={!diaPainel}
-          onClick={() => diaPainel && setEditando(diaPainel)}
-        >
-          {t('Fechar caixa', 'Close cash')}
-        </Button>
       </Stack>
 
       {erro ? <Alert severity="error" onClose={() => setErro('')}>{erro}</Alert> : null}
@@ -244,18 +287,17 @@ export function FechamentoCaixaPage() {
                       />
                     )
                   }
-                  const status = dia.id ? dia.status : 'rascunho'
-                  const tom = tomMap[status] || tomMap.rascunho
-                  const rotulo = ROTULO[status] || ROTULO.rascunho
+                  const chave = rotuloDia(dia)
+                  const tom = tomMap[chave] || tomMap.rascunho
+                  const rotulo = ROTULO[chave]
                   const valor = totalDia(dia)
                   const ehHoje = dia.data === hoje
                   const ativo = diaPainel?.data === dia.data
-                  const temLancamento = Boolean(dia.id)
+                  const temPdv = chegouDoPdv(dia)
                   return (
                     <Box
                       key={dia.data}
-                      onClick={() => abrirDia(dia)}
-                      onDoubleClick={() => setEditando(dia)}
+                      onClick={() => setSelecionado(dia)}
                       sx={{
                         borderRight: '1px solid',
                         borderColor: 'divider',
@@ -282,28 +324,37 @@ export function FechamentoCaixaPage() {
                       <Typography sx={{ alignSelf: 'flex-end', fontSize: 13, fontWeight: 500, color: 'text.secondary', lineHeight: 1 }}>
                         {Number(dia.data.slice(8, 10))}
                       </Typography>
-                      {temLancamento ? (
+                      {temPdv || chave ? (
                         <Box sx={{ mt: 0.75 }}>
-                          <Typography sx={{ fontSize: 12, color: 'text.secondary', lineHeight: 1.2 }}>
-                            {t('Total', 'Total')}
-                          </Typography>
-                          <Typography sx={{ fontSize: 13, fontWeight: 600, fontVariantNumeric: 'tabular-nums', lineHeight: 1.25 }}>
-                            {brl(valor)}
-                          </Typography>
-                          <Chip
-                            size="small"
-                            label={idioma === 'en' ? rotulo[1] : rotulo[0]}
-                            variant="outlined"
-                            sx={{
-                              mt: 0.75,
-                              height: 22,
-                              fontSize: 11,
-                              fontWeight: 500,
-                              color: tom.color,
-                              borderColor: tom.border,
-                              bgcolor: tom.bg,
-                            }}
-                          />
+                          {temPdv ? (
+                            <>
+                              <Typography sx={{ fontSize: 12, color: 'text.secondary', lineHeight: 1.2 }}>
+                                {t('Total', 'Total')}
+                              </Typography>
+                              <Typography sx={{ fontSize: 13, fontWeight: 600, fontVariantNumeric: 'tabular-nums', lineHeight: 1.25 }}>
+                                {brl(valor)}
+                              </Typography>
+                              <Typography sx={{ fontSize: 11, color: 'text.secondary', mt: 0.35 }}>
+                                {t('Caixa', 'Cash')} {brl(caixaGaveta(dia))}
+                              </Typography>
+                            </>
+                          ) : null}
+                          {rotulo ? (
+                            <Chip
+                              size="small"
+                              label={idioma === 'en' ? rotulo[1] : rotulo[0]}
+                              variant="outlined"
+                              sx={{
+                                mt: 0.75,
+                                height: 22,
+                                fontSize: 11,
+                                fontWeight: 500,
+                                color: tom.color,
+                                borderColor: tom.border,
+                                bgcolor: tom.bg,
+                              }}
+                            />
+                          ) : null}
                         </Box>
                       ) : null}
                     </Box>
@@ -328,8 +379,8 @@ export function FechamentoCaixaPage() {
           <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
             <Metrica rotulo={t('Total', 'Total')} valor={brl(diaPainel ? totalDia(diaPainel) : 0)} />
             <Metrica rotulo={t('Dinheiro + PIX', 'Cash + PIX')} valor={brl(diaPainel ? gate(diaPainel) : 0)} />
-            <Metrica rotulo={t('Dias pendentes', 'Pending days')} valor={String(pendentes)} alerta={pendentes > 0} />
-            <Metrica rotulo={t('Conferidos', 'Checked')} valor={String(resumo?.conferidos ?? 0)} />
+            <Metrica rotulo={t('Sem dados', 'Missing days')} valor={String(faltando)} alerta={faltando > 0} />
+            <Metrica rotulo={t('Fechados', 'Closed')} valor={String(fechados)} />
           </Box>
 
           <Box>
@@ -340,36 +391,44 @@ export function FechamentoCaixaPage() {
             <LinhaResumo cor="#0EA5E9" rotulo="PIX" valor={brl(diaPainel?.pix ?? 0)} />
             <LinhaResumo cor="#6366F1" rotulo={t('Cartões', 'Cards')} valor={brl(diaPainel ? cartoes(diaPainel) : 0)} />
             <LinhaResumo cor="#F59E0B" rotulo="iFood" valor={brl(diaPainel?.ifood ?? 0)} />
+            <LinhaResumo cor="#FB7185" rotulo="99Food" valor={brl(diaPainel?.food99 ?? 0)} />
             <LinhaResumo cor="#94A3B8" rotulo={t('Despesas', 'Expenses')} valor={brl(diaPainel?.despesas_caixa ?? 0)} />
+            <LinhaResumo cor="#22C55E" rotulo={t('Depósitos', 'Deposits')} valor={brl(diaPainel?.depositos_caixa ?? 0)} />
+            <LinhaResumo cor="#EAB308" rotulo={t('Dinheiro em caixa', 'Cash in drawer')} valor={brl(diaPainel ? caixaGaveta(diaPainel) : 0)} />
           </Box>
 
           <Box sx={{ mt: 'auto', pt: 1 }}>
-            {diaPainel?.id ? (
-              <Chip
-                size="small"
-                label={idioma === 'en' ? (ROTULO[diaPainel.status]?.[1] || 'Draft') : (ROTULO[diaPainel.status]?.[0] || 'Pendente')}
-                variant="outlined"
-                sx={{
-                  mb: 1.5,
-                  color: (tomMap[diaPainel.status] || tomMap.rascunho).color,
-                  borderColor: (tomMap[diaPainel.status] || tomMap.rascunho).border,
-                  bgcolor: (tomMap[diaPainel.status] || tomMap.rascunho).bg,
-                }}
-              />
+            {diaPainel && chegouDoPdv(diaPainel) && diaPainel.status === 'fechado' ? (
+              <>
+                <Chip size="small" label={t('Caixa fechado', 'Cash closed')} variant="outlined" sx={{ mb: 1.5, color: tomMap.fechado.color, borderColor: tomMap.fechado.border, bgcolor: tomMap.fechado.bg }} />
+                <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>
+                  {t('PDV travado. Despesas lançadas. Só consulta.', 'POS locked. Expenses posted. View only.')}
+                </Typography>
+              </>
+            ) : diaPainel && chegouDoPdv(diaPainel) ? (
+              <>
+                <Typography sx={{ fontSize: 13, color: 'text.secondary', mb: 1.5 }}>
+                  {t('Vendas do PDV já vieram. Lance a despesa de caixa e feche o dia.', 'POS sales are in. Post cash expenses, then close the day.')}
+                </Typography>
+                <Button fullWidth variant="contained" onClick={() => setEditando(diaPainel)}>
+                  {t('Lançar despesa e fechar', 'Post expense and close')}
+                </Button>
+              </>
+            ) : diaPainel && diaPainel.data < hoje ? (
+              <Typography sx={{ fontSize: 13, color: 'error.main' }}>
+                {t('O servidor não enviou as vendas deste dia.', 'The store did not send this day’s sales.')}
+              </Typography>
             ) : (
-              <Typography sx={{ fontSize: 13, color: 'text.secondary', mb: 1.5 }}>
-                {t('Sem lançamento neste dia.', 'No entry on this day.')}
+              <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>
+                {t('Aguardando o envio do servidor da loja.', 'Waiting for the store server.')}
               </Typography>
             )}
-            <Button fullWidth variant="contained" disabled={!diaPainel} onClick={() => diaPainel && setEditando(diaPainel)}>
-              {diaPainel?.id ? t('Editar dia', 'Edit day') : t('Lançar dia', 'Post day')}
-            </Button>
           </Box>
         </Paper>
       </Box>
 
       {editando ? (
-        <FormDia
+        <FormDespesa
           dia={editando}
           onFechar={() => setEditando(null)}
           onSalvo={(mensagem) => {
@@ -391,42 +450,162 @@ export function FechamentoCaixaPage() {
   )
 }
 
-function FormDia({ dia, onFechar, onSalvo }: { dia: FechamentoDia; onFechar: () => void; onSalvo: (mensagem: string) => void }) {
-  const { t, idioma } = usePrefs()
-  const [dinheiro, setDinheiro] = useState(dinheiroTexto(dia.dinheiro))
-  const [pix, setPix] = useState(dinheiroTexto(dia.pix))
-  const [debito, setDebito] = useState(dinheiroTexto(dia.debito))
-  const [credito, setCredito] = useState(dinheiroTexto(dia.credito))
-  const [cartDigital, setCartDigital] = useState(dinheiroTexto(dia.cart_digital))
-  const [ifood, setIfood] = useState(dinheiroTexto(dia.ifood))
-  const [despesas, setDespesas] = useState(dinheiroTexto(dia.despesas_caixa))
-  const [observacao, setObservacao] = useState(dia.observacao || '')
+function novaLinha(tipo: 'despesa' | 'deposito'): LancamentoCaixa {
+  return {
+    tipo,
+    valor: 0,
+    valor_texto: '',
+    plano_conta_id: null,
+    fornecedor_id: null,
+    numero: '',
+    descricao: '',
+    plano: '',
+    fornecedor: '',
+    comprovante_nome: '',
+    tem_comprovante: false,
+  }
+}
+
+function arquivoBase64(arquivo: File) {
+  return new Promise<{ nome: string; mime: string; base64: string }>((resolve, reject) => {
+    const leitor = new FileReader()
+    leitor.onload = () => {
+      const texto = String(leitor.result || '')
+      const base64 = texto.includes(',') ? texto.slice(texto.indexOf(',') + 1) : texto
+      resolve({ nome: arquivo.name, mime: arquivo.type || 'application/octet-stream', base64 })
+    }
+    leitor.onerror = () => reject(new Error('Não leu o arquivo'))
+    leitor.readAsDataURL(arquivo)
+  })
+}
+
+function abrirBase64(arquivo: { nome: string; mime: string; base64: string }) {
+  const binario = atob(arquivo.base64)
+  const bytes = new Uint8Array(binario.length)
+  for (let i = 0; i < binario.length; i += 1) bytes[i] = binario.charCodeAt(i)
+  const url = URL.createObjectURL(new Blob([bytes], { type: arquivo.mime }))
+  window.open(url, '_blank', 'noopener')
+}
+
+function Kpi({
+  rotulo,
+  valor,
+  icone,
+  tom,
+  alerta,
+}: {
+  rotulo: string
+  valor: string
+  icone: ReactNode
+  tom: 'verde' | 'teal' | 'ambar'
+  alerta?: boolean
+}) {
+  const paleta = {
+    verde: { bg: 'rgba(16,185,129,0.12)', cor: '#059669', borda: 'rgba(16,185,129,0.28)' },
+    teal: { bg: 'rgba(13,148,136,0.1)', cor: '#0F766E', borda: 'rgba(13,148,136,0.24)' },
+    ambar: { bg: 'rgba(245,158,11,0.14)', cor: '#B45309', borda: 'rgba(245,158,11,0.4)' },
+  }[tom]
+  return (
+    <Stack
+      direction="row"
+      spacing={1.25}
+      sx={{
+        alignItems: 'center',
+        px: 1.5,
+        py: 1,
+        minWidth: 148,
+        borderRadius: 2,
+        bgcolor: alerta ? 'rgba(220,38,38,0.08)' : paleta.bg,
+        border: '1px solid',
+        borderColor: alerta ? 'error.light' : paleta.borda,
+      }}
+    >
+      <Box sx={{ color: alerta ? 'error.main' : paleta.cor, display: 'flex' }}>{icone}</Box>
+      <Box>
+        <Typography sx={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: alerta ? 'error.main' : paleta.cor }}>{rotulo}</Typography>
+        <Typography sx={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums', lineHeight: 1.2, color: alerta ? 'error.main' : 'text.primary' }}>{valor}</Typography>
+      </Box>
+    </Stack>
+  )
+}
+
+function FormDespesa({ dia, onFechar, onSalvo }: { dia: FechamentoDia; onFechar: () => void; onSalvo: (mensagem: string) => void }) {
+  const { t, idioma, modo } = usePrefs()
+  const escuro = modo === 'escuro'
+  const [linhas, setLinhas] = useState<LancamentoCaixa[]>(
+    (dia.lancamentos?.length ? dia.lancamentos : []).map((item) => ({
+      ...item,
+      valor_texto: item.valor ? dinheiroTexto(item.valor) : '',
+    })),
+  )
   const [erro, setErro] = useState('')
   const [salvando, setSalvando] = useState(false)
+  const [hits, setHits] = useState<Fornecedor[]>([])
+  const [depositoAberto, setDepositoAberto] = useState(() => (dia.lancamentos || []).some((l) => l.tipo === 'deposito'))
   const fechado = dia.status === 'fechado'
   const dataBr = new Date(`${dia.data}T12:00:00`).toLocaleDateString(idioma === 'en' ? 'en-US' : 'pt-BR')
+  const totalDespesas = linhas.filter((l) => l.tipo === 'despesa').reduce((s, l) => s + (Number(l.valor) || 0), 0)
+  const totalDepositos = linhas.filter((l) => l.tipo === 'deposito').reduce((s, l) => s + (Number(l.valor) || 0), 0)
+  const saidas = Math.round((totalDespesas + totalDepositos) * 100) / 100
+  const gaveta = Math.round((dia.dinheiro - saidas) * 100) / 100
+  const campo = {
+    width: '100%',
+    '& .MuiInputBase-root': { height: 36 },
+    '& .MuiInputBase-input': { fontSize: 13, py: 0.75, overflow: 'hidden', textOverflow: 'ellipsis' },
+  }
+  const campoValor = {
+    width: '100%',
+    '& .MuiInputBase-root': { height: 36 },
+    '& .MuiInputBase-input': { fontSize: 13, py: 0.75, fontVariantNumeric: 'tabular-nums', textAlign: 'right' },
+  }
 
-  const salvar = async () => {
+  const buscar = (texto: string) => {
+    api.fornecedores(texto).then(setHits).catch(() => setHits([]))
+  }
+
+  const mudar = (indice: number, patch: Partial<LancamentoCaixa>) => {
+    setLinhas((atual) => atual.map((item, i) => (i === indice ? { ...item, ...patch } : item)))
+  }
+
+  const anexar = async (indice: number, arquivo: File | undefined) => {
+    if (!arquivo) return
+    if (arquivo.size > 8 * 1024 * 1024) {
+      setErro(t('Comprovante maior que 8 MB.', 'Receipt larger than 8 MB.'))
+      return
+    }
+    try {
+      const comprovante = await arquivoBase64(arquivo)
+      mudar(indice, { comprovante, comprovante_nome: comprovante.nome, tem_comprovante: true, remover_comprovante: false })
+    } catch {
+      setErro(t('Não leu o comprovante.', 'Could not read the receipt.'))
+    }
+  }
+
+  const payload = (status: 'rascunho' | 'fechado') => ({
+    empresa_id: dia.empresa_id,
+    data: dia.data,
+    dinheiro: dia.dinheiro,
+    pix: dia.pix,
+    debito: dia.debito,
+    credito: dia.credito,
+    cart_digital: dia.cart_digital,
+    ifood: dia.ifood,
+    azul: dia.azul,
+    rappi: dia.rappi,
+    food99: dia.food99,
+    lancamentos: linhas.map((item) => ({
+      ...item,
+      remover_comprovante: item.remover_comprovante === true,
+    })),
+    status,
+  })
+
+  const salvar = async (status: 'rascunho' | 'fechado') => {
     setErro('')
     setSalvando(true)
     try {
-      await api.salvarCaixa({
-        empresa_id: dia.empresa_id,
-        data: dia.data,
-        dinheiro: lerDinheiro(dinheiro),
-        pix: lerDinheiro(pix),
-        debito: lerDinheiro(debito),
-        credito: lerDinheiro(credito),
-        cart_digital: lerDinheiro(cartDigital),
-        ifood: lerDinheiro(ifood),
-        azul: dia.azul,
-        rappi: dia.rappi,
-        food99: dia.food99,
-        despesas_caixa: lerDinheiro(despesas),
-        observacao,
-        status: fechado ? 'fechado' : 'conferido',
-      })
-      onSalvo(t('Caixa salvo.', 'Cash closing saved.'))
+      await api.salvarCaixa(payload(status))
+      onSalvo(status === 'fechado' ? t('Caixa fechado.', 'Cash closed.') : t('Lançamentos salvos.', 'Entries saved.'))
     } catch (err) {
       setErro(err instanceof Error ? err.message : t('Não salvou', 'Could not save'))
     } finally {
@@ -434,31 +613,298 @@ function FormDia({ dia, onFechar, onSalvo }: { dia: FechamentoDia; onFechar: () 
     }
   }
 
-  return (
-    <Drawer anchor="right" open onClose={onFechar} slotProps={{ paper: { sx: { width: 420 } } }}>
-      <Stack spacing={1.5} sx={{ p: 3, overflow: 'auto' }}>
-        <Typography variant="h6">{t('Fechar caixa', 'Close cash')}</Typography>
-        <Typography variant="body2" color="text.secondary">{dia.empresa} · {dataBr}</Typography>
-        <TextField label={t('Dinheiro', 'Cash')} size="small" value={dinheiro} disabled={fechado} onChange={(ev) => setDinheiro(ev.target.value)} />
-        <TextField label={t('PIX bancário', 'Bank PIX')} size="small" value={pix} disabled={fechado} onChange={(ev) => setPix(ev.target.value)} />
-        <TextField label={t('Débito', 'Debit')} size="small" value={debito} disabled={fechado} onChange={(ev) => setDebito(ev.target.value)} />
-        <TextField label={t('Crédito', 'Credit')} size="small" value={credito} disabled={fechado} onChange={(ev) => setCredito(ev.target.value)} />
-        <TextField label={t('Cartão digital', 'Digital card')} size="small" value={cartDigital} disabled={fechado} onChange={(ev) => setCartDigital(ev.target.value)} />
-        <TextField label="iFood" size="small" value={ifood} disabled={fechado} onChange={(ev) => setIfood(ev.target.value)} />
-        <TextField label={t('Despesas', 'Expenses')} size="small" value={despesas} disabled={fechado} onChange={(ev) => setDespesas(ev.target.value)} />
-        <TextField label={t('Observação', 'Note')} size="small" multiline minRows={2} value={observacao} disabled={fechado} onChange={(ev) => setObservacao(ev.target.value)} />
-        {fechado ? <Alert severity="info">{t('Dia fechado. Só consulta.', 'Day closed. View only.')}</Alert> : null}
-        {erro ? <Alert severity="error">{erro}</Alert> : null}
-        <Stack direction="row" spacing={1} sx={{ pt: 1 }}>
-          <Button onClick={onFechar}>{t('Cancelar', 'Cancel')}</Button>
+  const modalidades = [
+    [t('Dinheiro', 'Cash'), dia.dinheiro, '#10B981'],
+    ['PIX', dia.pix, '#06B6D4'],
+    [t('Débito', 'Debit'), dia.debito, '#8B5CF6'],
+    [t('Crédito', 'Credit'), dia.credito, '#6366F1'],
+    ['iFood', dia.ifood, '#EF4444'],
+    ['99Food', dia.food99, '#F59E0B'],
+  ] as Array<[string, number, string]>
+  const totalPdv = totalDia(dia)
+
+  const abrirDeposito = () => {
+    setDepositoAberto(true)
+    setLinhas((atual) => (atual.some((l) => l.tipo === 'deposito') ? atual : [...atual, novaLinha('deposito')]))
+  }
+
+  const adicionar = (tipo: 'despesa' | 'deposito') => {
+    if (tipo === 'deposito') setDepositoAberto(true)
+    setLinhas((atual) => [...atual, novaLinha(tipo)])
+  }
+
+  const secao = (tipo: 'despesa' | 'deposito', titulo: string) => {
+    const itens = linhas.map((item, indice) => ({ item, indice })).filter(({ item }) => item.tipo === tipo)
+    const total = tipo === 'despesa' ? totalDespesas : totalDepositos
+    const recolhido = tipo === 'deposito' && !depositoAberto
+    return (
+      <Paper variant="outlined" sx={{ overflow: 'visible', display: 'flex', flexDirection: 'column' }}>
+        <Stack
+          direction="row"
+          sx={{
+            px: 1.75,
+            py: 1.1,
+            alignItems: 'center',
+            borderBottom: recolhido ? 'none' : '1px solid',
+            borderColor: 'divider',
+            bgcolor: escuro ? 'rgba(255,255,255,0.03)' : '#FAFBFC',
+          }}
+        >
+          {tipo === 'deposito' && !fechado ? (
+            <IconButton
+              size="small"
+              onClick={() => (depositoAberto ? setDepositoAberto(false) : abrirDeposito())}
+              aria-label={t('Preencher depósito', 'Fill deposit')}
+              sx={{ mr: 0.5, transform: depositoAberto ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.15s' }}
+            >
+              <KeyboardArrowDownIcon fontSize="small" />
+            </IconButton>
+          ) : (
+            <DescriptionOutlinedIcon sx={{ fontSize: 18, color: 'text.secondary', mr: 1 }} />
+          )}
+          <Typography sx={{ fontSize: 13, fontWeight: 600 }}>{titulo}</Typography>
+          <Chip size="small" label={String(itens.length)} sx={{ ml: 1, height: 20, fontSize: 11 }} />
           <Box sx={{ flex: 1 }} />
+          <Typography sx={{ fontSize: 12, color: 'text.secondary', mr: 1 }}>{t('Total', 'Total')}</Typography>
+          <Typography sx={{ fontSize: 13, fontWeight: 700, fontVariantNumeric: 'tabular-nums', mr: 1 }}>{brl(total)}</Typography>
           {!fechado ? (
-            <Button variant="contained" disabled={salvando} onClick={salvar}>
-              {salvando ? t('Salvando…', 'Saving…') : t('Salvar', 'Save')}
+            <Button
+              size="small"
+              startIcon={<AddIcon />}
+              onClick={() => adicionar(tipo)}
+            >
+              {t('Adicionar', 'Add')}
             </Button>
           ) : null}
         </Stack>
-      </Stack>
-    </Drawer>
+        <Collapse in={!recolhido} unmountOnExit={false}>
+          <Table size="small" sx={{ tableLayout: 'fixed', width: '100%' }}>
+            <TableHead>
+              <TableRow>
+                {tipo === 'despesa' ? (
+                  <>
+                    <TableCell sx={{ width: '36%' }}>{t('Fornecedor', 'Supplier')}</TableCell>
+                    <TableCell sx={{ width: '40%' }}>{t('Descrição', 'Description')}</TableCell>
+                  </>
+                ) : (
+                  <TableCell>{t('Descrição', 'Description')}</TableCell>
+                )}
+                <TableCell align="right" sx={{ width: 112 }}>{t('Valor', 'Amount')}</TableCell>
+                {tipo === 'despesa' ? <TableCell align="center" sx={{ width: 44, px: 0 }}><AttachFileOutlinedIcon sx={{ fontSize: 14, color: 'text.secondary' }} /></TableCell> : null}
+                <TableCell sx={{ width: 40, px: 0 }} />
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {!itens.length ? (
+                <TableRow>
+                  <TableCell colSpan={tipo === 'despesa' ? 5 : 3} sx={{ py: 4 }}>
+                    <Stack spacing={0.75} sx={{ alignItems: 'center', color: 'text.secondary' }}>
+                      <InsertDriveFileOutlinedIcon sx={{ fontSize: 32, opacity: 0.45 }} />
+                      <Typography sx={{ fontSize: 13, fontWeight: 600 }}>
+                        {tipo === 'despesa'
+                          ? t('Nenhuma despesa registrada.', 'No expense recorded.')
+                          : t('Nenhum depósito neste dia.', 'No deposits on this day.')}
+                      </Typography>
+                      <Typography sx={{ fontSize: 12 }}>
+                        {tipo === 'despesa'
+                          ? t('Clique em Adicionar para registrar uma despesa.', 'Click Add to record an expense.')
+                          : t('Clique na seta ou em Adicionar para preencher o depósito.', 'Click the arrow or Add to fill the deposit.')}
+                      </Typography>
+                    </Stack>
+                  </TableCell>
+                </TableRow>
+              ) : itens.map(({ item, indice }) => (
+                <TableRow key={`${tipo}-${indice}`}>
+                  {tipo === 'despesa' ? (
+                    <>
+                      <TableCell sx={{ py: 0.75, px: 1, width: '36%' }}>
+                        <Autocomplete
+                          size="small"
+                          freeSolo
+                          forcePopupIcon={false}
+                          options={hits}
+                          getOptionLabel={(opt) => typeof opt === 'string' ? opt : opt.nome}
+                          filterOptions={(opcoes) => opcoes}
+                          value={item.fornecedor || ''}
+                          inputValue={item.fornecedor || ''}
+                          onInputChange={(_, texto, motivo) => {
+                            if (motivo === 'input') {
+                              mudar(indice, { fornecedor: texto, fornecedor_id: null })
+                              buscar(texto)
+                            }
+                          }}
+                          onChange={(_, forn) => {
+                            if (typeof forn === 'string') mudar(indice, { fornecedor: forn, fornecedor_id: null })
+                            else mudar(indice, { fornecedor: forn?.nome || '', fornecedor_id: forn?.id || null })
+                          }}
+                          disabled={fechado}
+                          renderInput={(params) => <TextField {...params} placeholder={t('Nome', 'Name')} sx={campo} />}
+                        />
+                      </TableCell>
+                      <TableCell sx={{ py: 0.75, px: 1, width: '40%' }}>
+                        <TextField size="small" fullWidth value={item.descricao} disabled={fechado} onChange={(ev) => mudar(indice, { descricao: ev.target.value })} placeholder={t('O que foi pago', 'What was paid')} sx={campo} />
+                      </TableCell>
+                    </>
+                  ) : (
+                    <TableCell sx={{ py: 0.75, px: 1 }}>
+                      <TextField size="small" fullWidth value={item.descricao} disabled={fechado} onChange={(ev) => mudar(indice, { descricao: ev.target.value })} placeholder={t('Sangria / depósito', 'Skim / deposit')} sx={campo} />
+                    </TableCell>
+                  )}
+                  <TableCell align="right" sx={{ py: 0.75, px: 1, width: 112 }}>
+                    <TextField
+                      size="small"
+                      fullWidth
+                      value={item.valor_texto ?? (item.valor ? dinheiroTexto(item.valor) : '')}
+                      disabled={fechado}
+                      placeholder="0,00"
+                      onChange={(ev) => {
+                        const texto = mascararMoeda(ev.target.value)
+                        mudar(indice, { valor_texto: texto, valor: lerDinheiro(texto) })
+                      }}
+                      onBlur={() => {
+                        if (item.valor > 0) mudar(indice, { valor_texto: dinheiroTexto(item.valor) })
+                      }}
+                      inputProps={{ inputMode: 'decimal' }}
+                      sx={campoValor}
+                    />
+                  </TableCell>
+                  {tipo === 'despesa' ? (
+                    <TableCell align="center" sx={{ py: 0.5, px: 0, width: 44 }}>
+                      <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+                        <input
+                          id={`comp-${indice}`}
+                          type="file"
+                          hidden
+                          accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*"
+                          onChange={(ev) => {
+                            anexar(indice, ev.target.files?.[0])
+                            ev.target.value = ''
+                          }}
+                        />
+                        {item.tem_comprovante || item.comprovante ? (
+                          <>
+                            <Tooltip title={item.comprovante_nome || t('Comprovante', 'Receipt')}>
+                              <Button
+                                size="small"
+                                onClick={() => {
+                                  if (item.comprovante) abrirBase64(item.comprovante)
+                                  else if (item.id) api.abrirComprovanteCaixa(item.id).catch((err) => setErro(err instanceof Error ? err.message : t('Não abriu', 'Could not open')))
+                                }}
+                                sx={{ minWidth: 0, px: 0.5, fontSize: 12, textTransform: 'none', maxWidth: 90 }}
+                              >
+                                {(item.comprovante_nome || t('Ver', 'View')).slice(0, 14)}
+                              </Button>
+                            </Tooltip>
+                            {!fechado ? (
+                              <IconButton
+                                size="small"
+                                onClick={() => mudar(indice, { comprovante: undefined, comprovante_nome: '', tem_comprovante: false, remover_comprovante: true })}
+                                aria-label={t('Remover comprovante', 'Remove receipt')}
+                              >
+                                <CloseIcon sx={{ fontSize: 16 }} />
+                              </IconButton>
+                            ) : null}
+                          </>
+                        ) : !fechado ? (
+                          <Tooltip title={t('Anexar comprovante', 'Attach receipt')}>
+                            <IconButton size="small" onClick={() => document.getElementById(`comp-${indice}`)?.click()} aria-label={t('Anexar comprovante', 'Attach receipt')}>
+                              <AttachFileOutlinedIcon sx={{ fontSize: 18 }} />
+                            </IconButton>
+                          </Tooltip>
+                        ) : (
+                          <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>—</Typography>
+                        )}
+                      </Stack>
+                    </TableCell>
+                  ) : null}
+                  <TableCell sx={{ py: 0.5, px: 0, width: 40 }}>
+                    {!fechado ? (
+                      <IconButton size="small" onClick={() => setLinhas((atual) => atual.filter((_, i) => i !== indice))} aria-label={t('Excluir', 'Delete')}>
+                        <CloseIcon fontSize="small" />
+                      </IconButton>
+                    ) : null}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Collapse>
+      </Paper>
+    )
+  }
+
+  return (
+    <Dialog open onClose={onFechar} maxWidth="xl" fullWidth slotProps={{ paper: { sx: { maxHeight: '92vh', maxWidth: 1280 } } }}>
+      <DialogTitle sx={{ py: 1.75, px: 2.5, display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Box sx={{ width: 40, height: 40, borderRadius: 1.5, bgcolor: 'primary.main', color: '#fff', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+          <PointOfSaleOutlinedIcon fontSize="small" />
+        </Box>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography sx={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.03em' }}>{t('Fechar caixa', 'Close cash')}</Typography>
+          <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>{dia.empresa} · {dataBr}</Typography>
+        </Box>
+        <Stack direction="row" spacing={1} sx={{ display: { xs: 'none', md: 'flex' } }}>
+          <Kpi rotulo={t('Dinheiro PDV', 'POS cash')} valor={brl(dia.dinheiro)} tom="verde" icone={<CheckCircleOutlinedIcon fontSize="small" />} />
+          <Kpi rotulo={t('Saídas', 'Outflows')} valor={brl(saidas)} tom="teal" icone={<TrendingUpIcon fontSize="small" />} />
+          <Kpi rotulo={t('Dinheiro em caixa', 'Cash in drawer')} valor={brl(gaveta)} tom="ambar" alerta={gaveta < 0} icone={<AccountBalanceWalletOutlinedIcon fontSize="small" />} />
+        </Stack>
+        <IconButton onClick={onFechar}><CloseIcon /></IconButton>
+      </DialogTitle>
+      <DialogContent dividers sx={{ px: 2.5, py: 2, bgcolor: escuro ? 'background.default' : '#F4F6F8' }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '340px minmax(0, 1fr)' }, gap: 1.5, alignItems: 'start' }}>
+          <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+            <Stack direction="row" sx={{ px: 1.75, py: 1.15, alignItems: 'center', bgcolor: escuro ? 'primary.dark' : '#1B2A6B', color: '#fff' }}>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography sx={{ fontSize: 13, fontWeight: 700 }}>{t('Vendas do PDV', 'POS sales')}</Typography>
+              </Box>
+              <Typography sx={{ fontSize: 14, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{brl(totalPdv)}</Typography>
+            </Stack>
+            <Table size="small">
+              <TableBody>
+                {modalidades.map(([nome, valor, cor]) => (
+                  <TableRow key={nome}>
+                    <TableCell sx={{ py: 0.85, px: 1.5 }}>
+                      <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                        <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: cor, flexShrink: 0 }} />
+                        <Typography sx={{ fontSize: 13 }}>{nome}</Typography>
+                      </Stack>
+                    </TableCell>
+                    <TableCell align="right" sx={{ py: 0.85, px: 1.5, whiteSpace: 'nowrap' }}>
+                      <Typography sx={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, fontSize: 13 }}>{brl(valor)}</Typography>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 700, py: 0.9, px: 1.5, fontSize: 13 }}>{t('Total', 'Total')}</TableCell>
+                  <TableCell align="right" sx={{ py: 0.9, px: 1.5 }}>
+                    <Typography sx={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700, fontSize: 13 }}>{brl(totalPdv)}</Typography>
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </Paper>
+          <Stack spacing={1.5}>
+            {secao('despesa', t('Despesas de caixa', 'Cash expenses'))}
+            {secao('deposito', t('Depósitos', 'Deposits'))}
+            {fechado ? <Alert severity="info">{t('Dia fechado. Só consulta.', 'Day closed. View only.')}</Alert> : (
+              <Alert icon={<InfoOutlinedIcon fontSize="inherit" />} severity="info" sx={{ py: 0.5 }}>
+                {t('Revise as informações antes de fechar o caixa.', 'Review the information before closing the cash drawer.')}
+              </Alert>
+            )}
+            {erro ? <Alert severity="error">{erro}</Alert> : null}
+          </Stack>
+        </Box>
+      </DialogContent>
+      <DialogActions sx={{ px: 2.5, py: 1.5 }}>
+        <Button onClick={onFechar}>{t('Cancelar', 'Cancel')}</Button>
+        <Box sx={{ flex: 1 }} />
+        {!fechado ? (
+          <>
+            <Button disabled={salvando} onClick={() => salvar('rascunho')}>{t('Salvar', 'Save')}</Button>
+            <Button variant="contained" disabled={salvando} onClick={() => salvar('fechado')}>{t('Fechar caixa', 'Close cash')}</Button>
+          </>
+        ) : null}
+      </DialogActions>
+    </Dialog>
   )
 }

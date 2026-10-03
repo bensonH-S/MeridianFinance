@@ -157,6 +157,23 @@ export type AcessoItau = {
   ultima_mensagem: string
 }
 
+export type LancamentoCaixa = {
+  id?: string
+  tipo: 'despesa' | 'deposito'
+  valor: number
+  plano_conta_id: string | null
+  fornecedor_id: string | null
+  numero: string
+  descricao: string
+  plano?: string
+  fornecedor?: string
+  comprovante_nome?: string
+  tem_comprovante?: boolean
+  comprovante?: { nome: string; mime: string; base64: string }
+  remover_comprovante?: boolean
+  valor_texto?: string
+}
+
 export type FechamentoDia = {
   id: string | null
   empresa_id: string
@@ -173,6 +190,8 @@ export type FechamentoDia = {
   rappi: number
   food99: number
   despesas_caixa: number
+  depositos_caixa: number
+  lancamentos: LancamentoCaixa[]
   observacao: string
   status: 'rascunho' | 'conferido' | 'fechado'
   atualizado_em: string | null
@@ -306,6 +325,15 @@ export const api = {
     const data = await res.json()
     if (!res.ok) throw new Error(data.erro || 'Não salvou')
     return data as FechamentoDia
+  },
+  abrirComprovanteCaixa: async (id: string) => {
+    const res = await fetch(`${apiRoot}/caixa/lancamentos/${id}/comprovante`)
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.erro || 'Não abriu o comprovante')
+    }
+    const url = URL.createObjectURL(await res.blob())
+    window.open(url, '_blank', 'noopener')
   },
   configBkoffice: () => get<ConfigBkoffice>(`${apiRoot}/config/bkoffice`),
   salvarBkoffice: async (body: { usuario: string; senha: string; api: string; setor: string }) => {
