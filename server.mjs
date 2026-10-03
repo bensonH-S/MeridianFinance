@@ -17,7 +17,7 @@ import {
   salvarAcessoBb,
 } from './lib/bbDda.mjs'
 import { removerCadastro, salvarCadastro, usoDe } from './lib/cadastros.mjs'
-import { garantirSchemaCaixa, lerComprovante, mesFechamentos, receberIngestao, salvarFechamento } from './lib/fechamentoCaixa.mjs'
+import { garantirSchemaCaixa, lerComprovante, mesFechamentos, receberHeartbeat, receberIngestao, salvarFechamento } from './lib/fechamentoCaixa.mjs'
 import { gerarDanfe } from './lib/danfe.mjs'
 import { baixarBoletoDaDespesa, baixarNotaDaDespesa } from './lib/boletoEsupri.mjs'
 import { cruzarNotas } from './lib/nfEntrada.mjs'
@@ -641,6 +641,21 @@ const server = http.createServer(async (req, res) => {
         )))
       } catch (err) {
         return send(res, err.status || 400, JSON.stringify({ erro: err.message || 'Não recebeu o caixa da loja.' }))
+      }
+    }
+    if (req.method === 'POST' && url.pathname === '/api/caixa/heartbeat') {
+      const body = await readBody(req)
+      const auth = String(req.headers.authorization || '')
+      const token = auth.toLowerCase().startsWith('bearer ') ? auth.slice(7).trim() : ''
+      try {
+        return send(res, 200, JSON.stringify(await receberHeartbeat(
+          pool,
+          body,
+          env.CAIXA_INGEST_TOKEN || process.env.CAIXA_INGEST_TOKEN,
+          token,
+        )))
+      } catch (err) {
+        return send(res, err.status || 400, JSON.stringify({ erro: err.message || 'Não registrou o pulso da loja.' }))
       }
     }
     if (req.method === 'POST' && url.pathname === '/api/vendas/sync') {

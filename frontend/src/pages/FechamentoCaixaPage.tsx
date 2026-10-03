@@ -31,6 +31,11 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown'
 import PointOfSaleOutlinedIcon from '@mui/icons-material/PointOfSaleOutlined'
 import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined'
+import CreditCardOutlinedIcon from '@mui/icons-material/CreditCardOutlined'
+import DeliveryDiningOutlinedIcon from '@mui/icons-material/DeliveryDiningOutlined'
+import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined'
+import QrCode2OutlinedIcon from '@mui/icons-material/QrCode2Outlined'
+import RestaurantOutlinedIcon from '@mui/icons-material/RestaurantOutlined'
 import TrendingUpIcon from '@mui/icons-material/TrendingUp'
 import InsertDriveFileOutlinedIcon from '@mui/icons-material/InsertDriveFileOutlined'
 import { api, brl, type Empresa, type FechamentoDia, type Fornecedor, type LancamentoCaixa, type MesFechamento } from '../api'
@@ -80,10 +85,6 @@ function totalDia(d: FechamentoDia) {
 
 function gate(d: FechamentoDia) {
   return Math.round((d.dinheiro + d.pix) * 100) / 100
-}
-
-function cartoes(d: FechamentoDia) {
-  return Math.round((d.debito + d.credito + d.cart_digital) * 100) / 100
 }
 
 function caixaGaveta(d: FechamentoDia) {
@@ -139,6 +140,7 @@ function gradeMes(mes: string, dias: FechamentoDia[], empresaId: string, empresa
       food99: 0,
       despesas_caixa: 0,
       depositos_caixa: 0,
+      bandeiras: [],
       lancamentos: [],
       observacao: '',
       status: 'rascunho',
@@ -151,13 +153,111 @@ function gradeMes(mes: string, dias: FechamentoDia[], empresaId: string, empresa
   return semanas
 }
 
-function LinhaResumo({ cor, rotulo, valor }: { cor: string; rotulo: string; valor: string }) {
+function IconePagamento({ tipo }: { tipo: string }) {
+  const sx = { fontSize: 16, color: 'inherit' }
+  if (tipo === 'dinheiro') return <AccountBalanceWalletOutlinedIcon sx={sx} />
+  if (tipo === 'pix') return <QrCode2OutlinedIcon sx={sx} />
+  if (tipo === 'cartoes') return <CreditCardOutlinedIcon sx={sx} />
+  if (tipo === 'ifood') return <RestaurantOutlinedIcon sx={sx} />
+  if (tipo === 'food99') return <DeliveryDiningOutlinedIcon sx={sx} />
+  return <PaymentsOutlinedIcon sx={sx} />
+}
+
+function LinhaPagamento({
+  tipo,
+  cor,
+  rotulo,
+  valor,
+  abrir,
+  aberto,
+  onAbrir,
+  filhos,
+  denso,
+}: {
+  tipo: string
+  cor: string
+  rotulo: string
+  valor: string
+  abrir?: boolean
+  aberto?: boolean
+  onAbrir?: () => void
+  filhos?: ReactNode
+  denso?: boolean
+}) {
   return (
-    <Stack direction="row" spacing={1} sx={{ alignItems: 'center', py: 0.6 }}>
-      <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: cor, flexShrink: 0 }} />
-      <Typography sx={{ flex: 1, fontSize: 13, color: 'text.secondary' }}>{rotulo}</Typography>
-      <Typography sx={{ fontSize: 13, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{valor}</Typography>
-    </Stack>
+    <Box>
+      <Box
+        onClick={abrir ? onAbrir : undefined}
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: '22px minmax(0, 1fr) max-content',
+          columnGap: 1,
+          alignItems: 'center',
+          py: denso ? 0.35 : 0.55,
+          cursor: abrir ? 'pointer' : 'default',
+          userSelect: 'none',
+        }}
+      >
+        <Box sx={{ width: 22, height: 22, borderRadius: '50%', bgcolor: cor, color: '#fff', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+          <IconePagamento tipo={tipo} />
+        </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25, minWidth: 0 }}>
+          <Typography sx={{ fontSize: denso ? 12 : 13, color: 'text.secondary', lineHeight: 1.25 }}>{rotulo}</Typography>
+          {abrir ? (
+            <KeyboardArrowDownIcon sx={{ fontSize: 18, color: 'text.secondary', flexShrink: 0, transform: aberto ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.15s' }} />
+          ) : null}
+        </Box>
+        <Typography sx={{ fontSize: denso ? 12 : 13, fontWeight: 600, fontVariantNumeric: 'tabular-nums', textAlign: 'right', whiteSpace: 'nowrap' }}>{valor}</Typography>
+      </Box>
+      {abrir ? <Collapse in={!!aberto}>{filhos}</Collapse> : null}
+    </Box>
+  )
+}
+
+function LinhaDebitoCredito({
+  rotulo,
+  valor,
+  cor,
+  bandeiras,
+  aberto,
+  onAbrir,
+}: {
+  rotulo: string
+  valor: number
+  cor: string
+  bandeiras: Array<{ bandeira: string; tipo: string; valor: number }>
+  aberto: boolean
+  onAbrir: () => void
+}) {
+  const { t } = usePrefs()
+  return (
+    <LinhaPagamento
+      tipo="cartoes"
+      cor={cor}
+      rotulo={rotulo}
+      valor={brl(valor)}
+      abrir
+      aberto={aberto}
+      onAbrir={onAbrir}
+      filhos={(
+        <Box sx={{ pb: 0.25 }}>
+          {bandeiras.length ? bandeiras.map((item) => (
+            <LinhaPagamento
+              key={`${item.bandeira}-${item.tipo}`}
+              tipo="cartoes"
+              cor="#94A3B8"
+              rotulo={item.bandeira}
+              valor={brl(item.valor)}
+              denso
+            />
+          )) : (
+            <Typography sx={{ fontSize: 12, color: 'text.secondary', pl: '30px', py: 0.35 }}>
+              {t('A loja ainda não enviou as bandeiras.', 'The store has not sent card brands yet.')}
+            </Typography>
+          )}
+        </Box>
+      )}
+    />
   )
 }
 
@@ -183,6 +283,8 @@ export function FechamentoCaixaPage() {
   const [editando, setEditando] = useState<FechamentoDia | null>(null)
   const [erro, setErro] = useState('')
   const [aviso, setAviso] = useState('')
+  const [debitoAberto, setDebitoAberto] = useState(false)
+  const [creditoAberto, setCreditoAberto] = useState(false)
 
   const lojas = useMemo(() => empresas.filter((e) => e.tipo === 'loja'), [empresas])
   const hoje = hojeIso()
@@ -257,11 +359,26 @@ export function FechamentoCaixaPage() {
           {lojas.map((e) => <MenuItem key={e.id} value={e.id}>{e.apelido || e.razao_social}</MenuItem>)}
         </TextField>
         <TextField size="small" label={t('Mês', 'Month')} type="month" value={mes} onChange={(ev) => setMes(ev.target.value)} slotProps={{ inputLabel: { shrink: true } }} sx={{ width: 170, bgcolor: 'background.paper' }} />
+        <Tooltip
+          title={mesDados?.pdv?.ultimo_ok
+            ? `${t('Último oi', 'Last hello')} ${new Date(mesDados.pdv.ultimo_ok).toLocaleString(idioma === 'en' ? 'en-US' : 'pt-BR')}`
+            : t('A loja ainda não mandou o oi.', 'The store has not said hello yet.')}
+        >
+          <Chip
+            size="small"
+            color={mesDados?.pdv?.ok ? 'success' : 'warning'}
+            variant="outlined"
+            label={mesDados?.pdv?.ok
+              ? t('Tamos conectado', "We're connected")
+              : t('Sem sinal da loja', 'No store signal')}
+            sx={{ height: 32, fontWeight: 600 }}
+          />
+        </Tooltip>
       </Stack>
 
       {erro ? <Alert severity="error" onClose={() => setErro('')}>{erro}</Alert> : null}
 
-      <Box sx={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 320px' }, gap: 2 }}>
+      <Box sx={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 360px' }, gap: 2 }}>
         <Paper variant="outlined" sx={{ minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid', borderColor: 'divider' }}>
             {diasSemana.map((nome) => (
@@ -297,7 +414,11 @@ export function FechamentoCaixaPage() {
                   return (
                     <Box
                       key={dia.data}
-                      onClick={() => setSelecionado(dia)}
+                      onClick={() => {
+                        setSelecionado(dia)
+                        setDebitoAberto(false)
+                        setCreditoAberto(false)
+                      }}
                       sx={{
                         borderRight: '1px solid',
                         borderColor: 'divider',
@@ -387,14 +508,37 @@ export function FechamentoCaixaPage() {
             <Typography sx={{ fontSize: 12, fontWeight: 600, color: 'text.secondary', mb: 1, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
               {t('Por modalidade', 'By method')}
             </Typography>
-            <LinhaResumo cor="#3B82F6" rotulo={t('Dinheiro', 'Cash')} valor={brl(diaPainel?.dinheiro ?? 0)} />
-            <LinhaResumo cor="#0EA5E9" rotulo="PIX" valor={brl(diaPainel?.pix ?? 0)} />
-            <LinhaResumo cor="#6366F1" rotulo={t('Cartões', 'Cards')} valor={brl(diaPainel ? cartoes(diaPainel) : 0)} />
-            <LinhaResumo cor="#F59E0B" rotulo="iFood" valor={brl(diaPainel?.ifood ?? 0)} />
-            <LinhaResumo cor="#FB7185" rotulo="99Food" valor={brl(diaPainel?.food99 ?? 0)} />
-            <LinhaResumo cor="#94A3B8" rotulo={t('Despesas', 'Expenses')} valor={brl(diaPainel?.despesas_caixa ?? 0)} />
-            <LinhaResumo cor="#22C55E" rotulo={t('Depósitos', 'Deposits')} valor={brl(diaPainel?.depositos_caixa ?? 0)} />
-            <LinhaResumo cor="#EAB308" rotulo={t('Dinheiro em caixa', 'Cash in drawer')} valor={brl(diaPainel ? caixaGaveta(diaPainel) : 0)} />
+            <LinhaPagamento tipo="dinheiro" cor="#3B82F6" rotulo={t('Dinheiro', 'Cash')} valor={brl(diaPainel?.dinheiro ?? 0)} />
+            <LinhaPagamento tipo="pix" cor="#0EA5E9" rotulo="PIX" valor={brl(diaPainel?.pix ?? 0)} />
+            <LinhaDebitoCredito
+              rotulo={t('Débito', 'Debit')}
+              valor={diaPainel?.debito ?? 0}
+              cor="#8B5CF6"
+              bandeiras={(diaPainel?.bandeiras || []).filter((item) => item.tipo === 'debito')}
+              aberto={debitoAberto}
+              onAbrir={() => setDebitoAberto((v) => !v)}
+            />
+            <LinhaDebitoCredito
+              rotulo={t('Crédito', 'Credit')}
+              valor={diaPainel?.credito ?? 0}
+              cor="#4F46E5"
+              bandeiras={(diaPainel?.bandeiras || []).filter((item) => item.tipo === 'credito')}
+              aberto={creditoAberto}
+              onAbrir={() => setCreditoAberto((v) => !v)}
+            />
+            {(diaPainel?.cart_digital || 0) > 0 ? (
+              <LinhaPagamento tipo="cartoes" cor="#64748B" rotulo={t('Cartão digital', 'Digital card')} valor={brl(diaPainel?.cart_digital ?? 0)} />
+            ) : null}
+            <LinhaPagamento tipo="ifood" cor="#F59E0B" rotulo="iFood" valor={brl(diaPainel?.ifood ?? 0)} />
+            <LinhaPagamento tipo="food99" cor="#FB7185" rotulo="99Food" valor={brl(diaPainel?.food99 ?? 0)} />
+            <Box sx={{ borderTop: '1px solid', borderColor: 'divider', mt: 1, pt: 1.25 }}>
+              <Typography sx={{ fontSize: 12, fontWeight: 600, color: 'text.secondary', mb: 1, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                {t('Caixa', 'Cash drawer')}
+              </Typography>
+              <LinhaPagamento tipo="despesa" cor="#94A3B8" rotulo={t('Despesas', 'Expenses')} valor={brl(diaPainel?.despesas_caixa ?? 0)} />
+              <LinhaPagamento tipo="deposito" cor="#22C55E" rotulo={t('Depósitos', 'Deposits')} valor={brl(diaPainel?.depositos_caixa ?? 0)} />
+              <LinhaPagamento tipo="dinheiro" cor="#EAB308" rotulo={t('Dinheiro em caixa', 'Cash in drawer')} valor={brl(diaPainel ? caixaGaveta(diaPainel) : 0)} />
+            </Box>
           </Box>
 
           <Box sx={{ mt: 'auto', pt: 1 }}>
@@ -542,6 +686,8 @@ function FormDespesa({ dia, onFechar, onSalvo }: { dia: FechamentoDia; onFechar:
   const [salvando, setSalvando] = useState(false)
   const [hits, setHits] = useState<Fornecedor[]>([])
   const [depositoAberto, setDepositoAberto] = useState(() => (dia.lancamentos || []).some((l) => l.tipo === 'deposito'))
+  const [debitoAberto, setDebitoAberto] = useState(false)
+  const [creditoAberto, setCreditoAberto] = useState(false)
   const fechado = dia.status === 'fechado'
   const dataBr = new Date(`${dia.data}T12:00:00`).toLocaleDateString(idioma === 'en' ? 'en-US' : 'pt-BR')
   const totalDespesas = linhas.filter((l) => l.tipo === 'despesa').reduce((s, l) => s + (Number(l.valor) || 0), 0)
@@ -614,13 +760,11 @@ function FormDespesa({ dia, onFechar, onSalvo }: { dia: FechamentoDia; onFechar:
   }
 
   const modalidades = [
-    [t('Dinheiro', 'Cash'), dia.dinheiro, '#10B981'],
-    ['PIX', dia.pix, '#06B6D4'],
-    [t('Débito', 'Debit'), dia.debito, '#8B5CF6'],
-    [t('Crédito', 'Credit'), dia.credito, '#6366F1'],
-    ['iFood', dia.ifood, '#EF4444'],
-    ['99Food', dia.food99, '#F59E0B'],
-  ] as Array<[string, number, string]>
+    ['dinheiro', t('Dinheiro', 'Cash'), dia.dinheiro, '#10B981'],
+    ['pix', 'PIX', dia.pix, '#06B6D4'],
+    ['ifood', 'iFood', dia.ifood, '#EF4444'],
+    ['food99', '99Food', dia.food99, '#F59E0B'],
+  ] as Array<[string, string, number, string]>
   const totalPdv = totalDia(dia)
 
   const abrirDeposito = () => {
@@ -859,29 +1003,38 @@ function FormDespesa({ dia, onFechar, onSalvo }: { dia: FechamentoDia; onFechar:
               </Box>
               <Typography sx={{ fontSize: 14, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{brl(totalPdv)}</Typography>
             </Stack>
-            <Table size="small">
-              <TableBody>
-                {modalidades.map(([nome, valor, cor]) => (
-                  <TableRow key={nome}>
-                    <TableCell sx={{ py: 0.85, px: 1.5 }}>
-                      <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                        <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: cor, flexShrink: 0 }} />
-                        <Typography sx={{ fontSize: 13 }}>{nome}</Typography>
-                      </Stack>
-                    </TableCell>
-                    <TableCell align="right" sx={{ py: 0.85, px: 1.5, whiteSpace: 'nowrap' }}>
-                      <Typography sx={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, fontSize: 13 }}>{brl(valor)}</Typography>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 700, py: 0.9, px: 1.5, fontSize: 13 }}>{t('Total', 'Total')}</TableCell>
-                  <TableCell align="right" sx={{ py: 0.9, px: 1.5 }}>
-                    <Typography sx={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700, fontSize: 13 }}>{brl(totalPdv)}</Typography>
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
+            <Box sx={{ px: 1.25, py: 0.75 }}>
+              {modalidades.slice(0, 2).map(([tipo, nome, valor, cor]) => (
+                <LinhaPagamento key={tipo} tipo={tipo} cor={cor} rotulo={nome} valor={brl(valor)} />
+              ))}
+              <LinhaDebitoCredito
+                rotulo={t('Débito', 'Debit')}
+                valor={dia.debito}
+                cor="#8B5CF6"
+                bandeiras={(dia.bandeiras || []).filter((item) => item.tipo === 'debito')}
+                aberto={debitoAberto}
+                onAbrir={() => setDebitoAberto((v) => !v)}
+              />
+              <LinhaDebitoCredito
+                rotulo={t('Crédito', 'Credit')}
+                valor={dia.credito}
+                cor="#4F46E5"
+                bandeiras={(dia.bandeiras || []).filter((item) => item.tipo === 'credito')}
+                aberto={creditoAberto}
+                onAbrir={() => setCreditoAberto((v) => !v)}
+              />
+              {dia.cart_digital > 0 ? (
+                <LinhaPagamento tipo="cartoes" cor="#64748B" rotulo={t('Cartão digital', 'Digital card')} valor={brl(dia.cart_digital)} />
+              ) : null}
+              {modalidades.slice(2).map(([tipo, nome, valor, cor]) => (
+                <LinhaPagamento key={tipo} tipo={tipo} cor={cor} rotulo={nome} valor={brl(valor)} />
+              ))}
+              <Box sx={{ display: 'grid', gridTemplateColumns: '22px minmax(0, 1fr) max-content', columnGap: 1, alignItems: 'center', pt: 0.75, mt: 0.25, borderTop: '1px solid', borderColor: 'divider' }}>
+                <Box />
+                <Typography sx={{ fontSize: 13, fontWeight: 700 }}>{t('Total', 'Total')}</Typography>
+                <Typography sx={{ fontSize: 13, fontWeight: 700, fontVariantNumeric: 'tabular-nums', textAlign: 'right', whiteSpace: 'nowrap' }}>{brl(totalPdv)}</Typography>
+              </Box>
+            </Box>
           </Paper>
           <Stack spacing={1.5}>
             {secao('despesa', t('Despesas de caixa', 'Cash expenses'))}

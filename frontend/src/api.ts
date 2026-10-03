@@ -191,6 +191,7 @@ export type FechamentoDia = {
   food99: number
   despesas_caixa: number
   depositos_caixa: number
+  bandeiras?: Array<{ bandeira: string; tipo: string; valor: number }>
   lancamentos: LancamentoCaixa[]
   observacao: string
   status: 'rascunho' | 'conferido' | 'fechado'
@@ -208,6 +209,7 @@ export type MesFechamento = {
     fechados: number
     dinheiro_pix: number
   }
+  pdv?: { ok: boolean; ultimo_ok: string | null; ultimo_dia: string | null; atraso_horas: number | null; mensagem: string }
 }
 
 export type ConfigBkoffice = {
