@@ -356,7 +356,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'GET' && url.pathname === '/api/empresas') {
       const { rows } = await pool.query(`
-        select id, apelido, razao_social, tipo, cnpj from empresas where ativo order by tipo, apelido
+        select id, apelido, razao_social, tipo, cnpj, bk_number from empresas where ativo order by tipo, apelido
       `)
       return send(res, 200, JSON.stringify(rows))
     }

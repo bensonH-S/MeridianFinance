@@ -764,7 +764,7 @@ function FormDespesa({ dia, onFechar, onSalvo }: { dia: FechamentoDia; onFechar:
                       onBlur={() => {
                         if (item.valor > 0) mudar(indice, { valor_texto: dinheiroTexto(item.valor) })
                       }}
-                      inputProps={{ inputMode: 'decimal' }}
+                      slotProps={{ htmlInput: { inputMode: 'decimal' } }}
                       sx={campoValor}
                     />
                   </TableCell>

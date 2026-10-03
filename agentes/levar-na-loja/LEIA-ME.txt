@@ -1,0 +1,12 @@
+Leva ESTA pasta no pendrive. Nao leva o resto do projeto.
+
+Na loja, no Linux do PDV:
+
+  sh INSTALAR.sh
+
+URL e token ja estao no azimut_caixa.env.
+O mesmo pendrive vale nas 20 lojas.
+
+No servidor do Azimut o .env precisa ter CAIXA_INGEST_TOKEN
+igual ao AZIMUT_TOKEN deste pendrive.
+Senao o teste da loja falha.

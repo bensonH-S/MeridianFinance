@@ -1,4 +1,4 @@
-export type Empresa = { id: string; apelido: string; razao_social: string; tipo: 'loja' | 'holding'; cnpj?: string | null }
+export type Empresa = { id: string; apelido: string; razao_social: string; tipo: 'loja' | 'holding'; cnpj?: string | null; bk_number?: string | null }
 export type Conta = { id: string; empresa_id: string; nome: string; tipo: string; apelido: string }
 export type Plano = { id: string; nome: string }
 export type PlanoCompleto = {

@@ -109,7 +109,7 @@ export function Shell() {
 
         <Box component="nav" sx={{ flex: 1, px: 1.25, py: 1.75, overflowY: 'auto' }}>
           {grupos.map((grupo, index) => (
-            <Box key={grupo.titulo} sx={{ mt: index === 0 ? 0 : 2.5 }}>
+            <Box key={grupo.titulo[0]} sx={{ mt: index === 0 ? 0 : 2.5 }}>
               <Typography
                 sx={{
                   px: 1,
