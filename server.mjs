@@ -17,6 +17,7 @@ import {
   salvarAcessoBb,
 } from './lib/bbDda.mjs'
 import { removerCadastro, salvarCadastro, usoDe } from './lib/cadastros.mjs'
+import { garantirSchemaCaixa, mesFechamentos, salvarFechamento } from './lib/fechamentoCaixa.mjs'
 import { gerarDanfe } from './lib/danfe.mjs'
 import { baixarBoletoDaDespesa, baixarNotaDaDespesa } from './lib/boletoEsupri.mjs'
 import { cruzarNotas } from './lib/nfEntrada.mjs'
@@ -596,6 +597,24 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && url.pathname === '/api/vendas') {
       return send(res, 200, JSON.stringify(await resumoVendas(pool, url.searchParams.get('dia') || '')))
     }
+    if (req.method === 'GET' && url.pathname === '/api/caixa') {
+      try {
+        return send(res, 200, JSON.stringify(await mesFechamentos(pool, {
+          mes: url.searchParams.get('mes') || '',
+          empresaId: url.searchParams.get('empresa') || '',
+        })))
+      } catch (err) {
+        return send(res, err.status || 400, JSON.stringify({ erro: err.message || 'Não carregou o fechamento.' }))
+      }
+    }
+    if (req.method === 'PUT' && url.pathname === '/api/caixa') {
+      const body = await readBody(req)
+      try {
+        return send(res, 200, JSON.stringify(await salvarFechamento(pool, body)))
+      } catch (err) {
+        return send(res, err.status || 400, JSON.stringify({ erro: err.message || 'Não salvou o fechamento.' }))
+      }
+    }
     if (req.method === 'POST' && url.pathname === '/api/vendas/sync') {
       if (coletaVendas) {
         return send(res, 409, JSON.stringify({ erro: 'Já tem uma coleta de vendas em andamento.' }))
@@ -846,6 +865,7 @@ server.listen(port, '127.0.0.1', () => {
   }
   garantirSchemaBb(pool).catch((err) => console.error(`[bb] ${err.message}`))
   garantirSchemaItau(pool).catch((err) => console.error(`[sfg] ${err.message}`))
+  garantirSchemaCaixa(pool).catch((err) => console.error(`[caixa] ${err.message}`))
   if (intervaloBb >= 60000) {
     console.log(`[bb] coleta automática a cada ${Math.round(intervaloBb / 1000)}s`)
     setTimeout(cicloBb, 15000)

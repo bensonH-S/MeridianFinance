@@ -48,7 +48,7 @@ const grupos = [
 const titulos: Record<string, [string, string, string, string]> = {
   '/': ['Contas a pagar', 'Accounts payable', 'A origem da despesa e a conta que paga podem ser diferentes.', 'The expense source and the paying account can differ.'],
   '/receber': ['Contas a receber', 'Accounts receivable', 'Módulo em desenvolvimento.', 'Module in progress.'],
-  '/caixa': ['Fechamento de caixa', 'Cash closing', 'Módulo em desenvolvimento.', 'Module in progress.'],
+  '/caixa': ['Fechamento de caixa', 'Cash closing', 'Conferência do dia por loja: dinheiro, PIX e cartões.', 'Daily store closing: cash, PIX and cards.'],
   '/movimento': ['Contas movimento', 'Cash movement', 'Módulo em desenvolvimento.', 'Module in progress.'],
   '/vendas': ['Vendas', 'Sales', 'Entra sozinha, a cada poucos minutos.', 'Comes in on its own, every few minutes.'],
   '/dre': ['DRE', 'P&L', 'Módulo em desenvolvimento.', 'Module in progress.'],

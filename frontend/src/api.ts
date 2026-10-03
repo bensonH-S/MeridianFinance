@@ -157,6 +157,40 @@ export type AcessoItau = {
   ultima_mensagem: string
 }
 
+export type FechamentoDia = {
+  id: string | null
+  empresa_id: string
+  empresa: string
+  bk_number: string | null
+  data: string
+  dinheiro: number
+  pix: number
+  debito: number
+  credito: number
+  cart_digital: number
+  ifood: number
+  azul: number
+  rappi: number
+  food99: number
+  despesas_caixa: number
+  observacao: string
+  status: 'rascunho' | 'conferido' | 'fechado'
+  atualizado_em: string | null
+}
+
+export type MesFechamento = {
+  empresa: { id: string; apelido: string; bk_number: string | null }
+  mes: string
+  dias: FechamentoDia[]
+  totais: Record<string, number>
+  resumo: {
+    dias_com_movimento: number
+    conferidos: number
+    fechados: number
+    dinheiro_pix: number
+  }
+}
+
 export type ConfigBkoffice = {
   usuario: string
   api: string
@@ -261,6 +295,18 @@ export const api = {
     return data as { linhas: LinhaDda[] }
   },
   vendas: (dia: string) => get<ResumoVendas>(`${apiRoot}/vendas?dia=${encodeURIComponent(dia)}`),
+  caixaMes: (mes: string, empresaId: string) =>
+    get<MesFechamento>(`${apiRoot}/caixa?mes=${encodeURIComponent(mes)}&empresa=${encodeURIComponent(empresaId)}`),
+  salvarCaixa: async (body: Record<string, unknown>) => {
+    const res = await fetch(`${apiRoot}/caixa`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.erro || 'Não salvou')
+    return data as FechamentoDia
+  },
   configBkoffice: () => get<ConfigBkoffice>(`${apiRoot}/config/bkoffice`),
   salvarBkoffice: async (body: { usuario: string; senha: string; api: string; setor: string }) => {
     const res = await fetch(`${apiRoot}/config/bkoffice`, {
