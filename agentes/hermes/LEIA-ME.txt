@@ -1,0 +1,8 @@
+Hermes
+
+Nesta pasta, no Linux do PDV:
+
+  sh INSTALAR.sh
+
+Nao abra nem altere os outros arquivos.
+O mesmo pendrive vale nas 20 lojas.

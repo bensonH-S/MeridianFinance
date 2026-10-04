@@ -1,11 +1,9 @@
 # coding: utf-8
-import os
-import sys
-
+import os, sys
 aqui = os.path.dirname(os.path.abspath(__file__))
 os.chdir(aqui)
-sys.argv = ["mwpos_enviar_caixa.py", "--instalar"]
-caminho = os.path.join(aqui, "mwpos_enviar_caixa.py")
+sys.argv = ["hermes.py", "--instalar"]
+caminho = os.path.join(aqui, "hermes.py")
 if sys.version_info[0] < 3:
     execfile(caminho)
 else:

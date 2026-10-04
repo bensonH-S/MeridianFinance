@@ -1,15 +1,12 @@
 # coding: utf-8
-# Um arquivo so. Na loja Linux (CentOS / MWPOS / Python 2.7):
-#   python mwpos_enviar_caixa.py --instalar
-# ou de dois cliques / rode:
-#   sh INSTALAR.sh
-#
-# Ele descobre o BK no storecfg, testa o envio, e se der certo
-# instala o cron e manda do dia 1 do mes ate hoje.
-# O mesmo pendrive serve nas 20 lojas (URL e token iguais; BK muda sozinho).
+# Hermes. Na loja: sh INSTALAR.sh
+# Carga (so no Azimut): python hermes.py --selar
 
 from __future__ import print_function
 
+import base64
+import hashlib
+import hmac
 import json
 import os
 import re
@@ -17,6 +14,7 @@ import shutil
 import socket
 import sqlite3
 import stat
+import struct
 import subprocess
 import sys
 from datetime import datetime, timedelta
@@ -46,12 +44,104 @@ CANDIDATOS_PASTA = [
 ]
 
 DEST_DIR = "/home/administrador"
-DEST_SCRIPT = os.path.join(DEST_DIR, "azimut_enviar_caixa.py")
-DEST_ENV = os.path.join(DEST_DIR, "azimut_caixa.env")
-DEST_LOG = os.path.join(DEST_DIR, "azimut_caixa.log")
+DEST_SCRIPT = os.path.join(DEST_DIR, "hermes.py")
+DEST_CARGA = os.path.join(DEST_DIR, "hermes.dat")
+DEST_LOJA = os.path.join(DEST_DIR, "hermes.loja")
+DEST_LOG = os.path.join(DEST_DIR, "hermes.log")
 CRON_INGEST = "15 2 * * * {python} {script} >> {log} 2>&1"
-CRON_PING = "*/15 * * * * {python} {script} --ping >> {log} 2>&1"
-URL_PADRAO = "https://grupoalvim.com.br/financas/api/caixa/ingest"
+CRON_PING = "20 8,18 * * * {python} {script} --ping >> {log} 2>&1"
+NOME_CARGA = "hermes.dat"
+
+
+def _material():
+    a = bytearray([0x19, 0x2E, 0x7B, 0xC4, 0x51, 0x08, 0x9D, 0xF3, 0x66, 0xA0, 0x14, 0x8B, 0xE2, 0x37, 0x5C, 0xD9])
+    b = bytearray([0x51, 0x47, 0x16, 0xA9, 0x38, 0x6D, 0xF0, 0x9E, 0x0B, 0xC5, 0x71, 0xEE, 0x87, 0x52, 0x29, 0xB4])
+    return bytes(bytearray(x ^ y for x, y in zip(a, b)))
+
+
+def _estirar(sal):
+    bloco = sal + _material()
+    i = 0
+    while i < 8000:
+        bloco = hashlib.sha256(bloco).digest()
+        i += 1
+    return bloco
+
+
+def _fluxo(chave, tamanho):
+    saida = b""
+    n = 0
+    while len(saida) < tamanho:
+        saida += hmac.new(chave, struct.pack(">I", n), hashlib.sha256).digest()
+        n += 1
+    return saida[:tamanho]
+
+
+def _xor(a, b):
+    return bytes(bytearray(x ^ y for x, y in zip(bytearray(a), bytearray(b))))
+
+
+def selar_texto(texto):
+    if sys.version_info[0] >= 3 and not isinstance(texto, bytes):
+        bruto = texto.encode("utf-8")
+    elif sys.version_info[0] < 3 and isinstance(texto, unicode):
+        bruto = texto.encode("utf-8")
+    else:
+        bruto = texto
+    sal = os.urandom(16)
+    chave = _estirar(sal)
+    ct = _xor(bruto, _fluxo(chave, len(bruto)))
+    tag = hmac.new(chave, ct, hashlib.sha256).digest()
+    return base64.b64encode(b"H1" + sal + tag + ct)
+
+
+def abrir_carga(blob):
+    try:
+        if sys.version_info[0] >= 3 and isinstance(blob, bytes):
+            blob = blob.decode("ascii")
+        bruto = base64.b64decode(blob.strip())
+    except Exception:
+        return None
+    if len(bruto) < 50 or bruto[:2] != b"H1":
+        return None
+    sal = bruto[2:18]
+    tag = bruto[18:50]
+    ct = bruto[50:]
+    chave = _estirar(sal)
+    if hmac.new(chave, ct, hashlib.sha256).digest() != tag:
+        return None
+    texto = _xor(ct, _fluxo(chave, len(ct)))
+    if sys.version_info[0] >= 3:
+        texto = texto.decode("utf-8")
+    return json.loads(texto)
+
+
+def pasta_deste_arquivo():
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+def candidatos_carga():
+    return [
+        os.path.join(os.getcwd(), NOME_CARGA),
+        os.path.join(pasta_deste_arquivo(), NOME_CARGA),
+        DEST_CARGA,
+    ]
+
+
+def ler_carga():
+    for caminho in candidatos_carga():
+        if not os.path.isfile(caminho):
+            continue
+        try:
+            blob = open(caminho, "rb").read()
+            if sys.version_info[0] >= 3:
+                blob = blob.decode("ascii")
+            dados = abrir_carga(blob)
+            if dados and dados.get("t"):
+                return dados
+        except Exception:
+            continue
+    return None
 
 
 def dinheiro(n):
@@ -82,28 +172,34 @@ def ler_env(caminho):
     return dados
 
 
-def pasta_deste_arquivo():
-    return os.path.dirname(os.path.abspath(__file__))
-
-
-def candidatos_env():
-    return [
-        os.path.join(os.getcwd(), "azimut_caixa.env"),
-        os.path.join(pasta_deste_arquivo(), "azimut_caixa.env"),
-        DEST_ENV,
-    ]
-
-
 def carregar_cfg():
-    dados = {}
-    for caminho in candidatos_env():
+    carga = ler_carga() or {}
+    dados = {
+        "AZIMUT_URL": (carga.get("u") or "").strip(),
+        "AZIMUT_TOKEN": (carga.get("t") or "").strip(),
+    }
+    for caminho in (
+        os.path.join(pasta_deste_arquivo(), "hermes.loja"),
+        DEST_LOJA,
+    ):
         dados.update(ler_env(caminho))
-    for chave in ("AZIMUT_URL", "AZIMUT_TOKEN", "BK_NUMBER", "PASTA"):
-        if os.environ.get(chave):
-            dados[chave] = os.environ.get(chave)
-    if not dados.get("AZIMUT_URL"):
-        dados["AZIMUT_URL"] = URL_PADRAO
+    if os.environ.get("BK_NUMBER"):
+        dados["BK_NUMBER"] = os.environ.get("BK_NUMBER")
+    if os.environ.get("PASTA"):
+        dados["PASTA"] = os.environ.get("PASTA")
     return dados
+
+
+def gravar_loja(bk):
+    if not bk:
+        return
+    dest = open(DEST_LOJA, "w")
+    dest.write("BK_NUMBER=%s\n" % bk)
+    dest.close()
+    try:
+        os.chmod(DEST_LOJA, stat.S_IRUSR | stat.S_IWUSR)
+    except Exception:
+        pass
 
 
 def tem_order_db(pasta):
@@ -334,11 +430,18 @@ def enviar(url, token, payload):
     req.add_header("Authorization", "Bearer " + token)
     try:
         resp = urllib_request.urlopen(req, timeout=45)
-        texto_resp = resp.read()
-        print(texto_resp)
+        print("ok")
         return 0
     except urllib_error.HTTPError as err:
-        print("Azimut recusou:", err.code, err.read())
+        detalhe = err.read()
+        if sys.version_info[0] >= 3 and isinstance(detalhe, bytes):
+            detalhe = detalhe.decode("utf-8", "replace")
+        msg = ""
+        try:
+            msg = json.loads(detalhe).get("erro") or ""
+        except Exception:
+            msg = str(detalhe)[:180]
+        print("Hermes recusou:", err.code, msg)
         return 1
     except Exception as err:
         print("Nao enviou:", err)
@@ -349,7 +452,7 @@ def payload_dia(bk, data, totais, bandeiras=None):
     corpo = {
         "bk_number": bk,
         "data": data,
-        "observacao": "Servidor da loja MWPOS",
+        "observacao": "Hermes",
         "bandeiras": bandeiras or [],
     }
     corpo.update(totais)
@@ -379,20 +482,30 @@ def dia_com_venda(pasta, limite=14):
     return None, None, None
 
 
-def gravar_env(caminho, url, token):
-    linhas = [
-        "# Mesmo arquivo nas 20 lojas. O BK a loja descobre sozinha.",
-        "AZIMUT_URL=" + url,
-        "AZIMUT_TOKEN=" + token,
-        "",
-    ]
-    dest = open(caminho, "w")
-    dest.write("\n".join(linhas))
-    dest.close()
+def copiar_carga():
+    origem = None
+    for caminho in candidatos_carga():
+        if os.path.isfile(caminho) and os.path.abspath(caminho) != os.path.abspath(DEST_CARGA):
+            origem = caminho
+            break
+    if not origem:
+        return 1
+    shutil.copy2(origem, DEST_CARGA)
     try:
-        os.chmod(caminho, stat.S_IRUSR | stat.S_IWUSR)
+        os.chmod(DEST_CARGA, stat.S_IRUSR | stat.S_IWUSR)
     except Exception:
         pass
+    return 0
+
+
+def limpar_legado():
+    for nome in ("azimut_enviar_caixa.py", "azimut_caixa.env", "azimut_caixa.log"):
+        caminho = os.path.join(DEST_DIR, nome)
+        try:
+            if os.path.isfile(caminho):
+                os.remove(caminho)
+        except Exception:
+            pass
 
 
 def instalar_cron():
@@ -405,7 +518,7 @@ def instalar_cron():
     atuais = []
     if out:
         for item in out.splitlines():
-            if "azimut_enviar_caixa.py" in item:
+            if "azimut_enviar_caixa.py" in item or "hermes.py" in item:
                 continue
             if item.strip():
                 atuais.append(item.rstrip("\n"))
@@ -419,8 +532,7 @@ def instalar_cron():
     if proc.returncode != 0:
         print("Nao gravou o cron:", err)
         return 1
-    print("cron:", ping_cron)
-    print("cron:", ingest)
+    print("cron ok")
     return 0
 
 
@@ -429,7 +541,7 @@ def instalar():
     url = (cfg.get("AZIMUT_URL") or "").strip()
     token = (cfg.get("AZIMUT_TOKEN") or "").strip()
     if not url or not token:
-        print("Falta AZIMUT_TOKEN no azimut_caixa.env desta pasta.")
+        print("Hermes sem carga. Falta hermes.dat.")
         return 1
 
     pasta = achar_pasta(cfg)
@@ -450,14 +562,26 @@ def instalar():
         return 1
 
     shutil.copy2(os.path.abspath(__file__), DEST_SCRIPT)
-    gravar_env(DEST_ENV, url, token)
-    print("instalado:", DEST_SCRIPT)
-    print("config:", DEST_ENV)
+    if copiar_carga():
+        print("Hermes sem carga. Falta hermes.dat.")
+        return 1
+    limpar_legado()
+    try:
+        os.chmod(DEST_SCRIPT, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
+    except Exception:
+        pass
+    print("Hermes no ar.")
 
     print("--- oi, tamos conectado ---")
     if ping(url, token, bk):
+        mwpos = re.sub(r"\D", "", ler_chave_storecfg(pasta, "Store.Id"))
         print("O Azimut nao recebeu o oi da loja.")
+        if mwpos and mwpos != bk:
+            print("MWPOS:", mwpos, "enviado:", bk)
+        print("Se o BK no Azimut for outro:")
+        print("  BK_NUMBER=XXXXX python hermes.py --instalar")
         return 1
+    gravar_loja(bk)
 
     print("--- teste de envio ---")
     dia, totais, ids = dia_com_venda(pasta)
@@ -483,14 +607,27 @@ def instalar():
 
 
 def uso():
-    print("Na loja:")
-    print("  python mwpos_enviar_caixa.py --instalar")
-    print("  python mwpos_enviar_caixa.py --ping")
-    print("  python mwpos_enviar_caixa.py              # ontem")
-    print("  python mwpos_enviar_caixa.py --mes")
-    print("  python mwpos_enviar_caixa.py --hoje")
-    print("  python mwpos_enviar_caixa.py 2026-10-02")
+    print("sh INSTALAR.sh")
     return 2
+
+
+def selar():
+    origem = os.path.join(os.path.dirname(pasta_deste_arquivo()), "azimut_caixa.env")
+    if len(sys.argv) >= 3 and sys.argv[2] not in ("--selar",):
+        origem = sys.argv[2]
+    dados = ler_env(origem)
+    url = (dados.get("AZIMUT_URL") or "").strip()
+    token = (dados.get("AZIMUT_TOKEN") or "").strip()
+    if not url or not token:
+        print("Nao selou.")
+        return 1
+    dest = os.path.join(pasta_deste_arquivo(), NOME_CARGA)
+    blob = selar_texto(json.dumps({"u": url, "t": token}, separators=(",", ":")))
+    if sys.version_info[0] >= 3 and isinstance(blob, str):
+        blob = blob.encode("ascii")
+    open(dest, "wb").write(blob)
+    print("carga pronta")
+    return 0
 
 
 def escolher_datas(argv):
@@ -538,7 +675,7 @@ def enviar_periodo(cfg, pasta, bk, url, token, dias):
     if url and token:
         ping(url, token, bk)
     if not url or not token:
-        print("So extrai. Coloque AZIMUT_URL e AZIMUT_TOKEN no azimut_caixa.env")
+        print("Hermes sem carga.")
         return 0
     print("enviados:", enviados, "pulados:", pulados, "falhas:", falhas)
     return 1 if falhas else 0
@@ -546,6 +683,8 @@ def enviar_periodo(cfg, pasta, bk, url, token, dias):
 
 def main():
     argv = sys.argv[1:]
+    if argv and argv[0] == "--selar":
+        return selar()
     if argv and argv[0] == "--instalar":
         return instalar()
 
@@ -568,7 +707,7 @@ def main():
     print("pasta:", pasta)
     print("loja:", bk, texto(nome))
     if not bk:
-        print("Nao achei o BK. Informe BK_NUMBER no azimut_caixa.env")
+        print("Nao achei o BK.")
         return 1
     return enviar_periodo(cfg, pasta, bk, url, token, dias)
 

@@ -361,16 +361,16 @@ export function FechamentoCaixaPage() {
         <TextField size="small" label={t('Mês', 'Month')} type="month" value={mes} onChange={(ev) => setMes(ev.target.value)} slotProps={{ inputLabel: { shrink: true } }} sx={{ width: 170, bgcolor: 'background.paper' }} />
         <Tooltip
           title={mesDados?.pdv?.ultimo_ok
-            ? `${t('Último oi', 'Last hello')} ${new Date(mesDados.pdv.ultimo_ok).toLocaleString(idioma === 'en' ? 'en-US' : 'pt-BR')}`
-            : t('A loja ainda não mandou o oi.', 'The store has not said hello yet.')}
+            ? `${t('Último heartbeat', 'Last heartbeat')} ${new Date(mesDados.pdv.ultimo_ok).toLocaleString(idioma === 'en' ? 'en-US' : 'pt-BR')}`
+            : t('A loja ainda não enviou heartbeat.', 'The store has not sent a heartbeat yet.')}
         >
           <Chip
             size="small"
             color={mesDados?.pdv?.ok ? 'success' : 'warning'}
             variant="outlined"
             label={mesDados?.pdv?.ok
-              ? t('Tamos conectado', "We're connected")
-              : t('Sem sinal da loja', 'No store signal')}
+              ? t('PDV online', 'POS online')
+              : t('PDV offline', 'POS offline')}
             sx={{ height: 32, fontWeight: 600 }}
           />
         </Tooltip>
@@ -486,8 +486,8 @@ export function FechamentoCaixaPage() {
           </Box>
         </Paper>
 
-        <Paper variant="outlined" sx={{ p: 2.5, minHeight: 0, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <Box>
+        <Paper variant="outlined" sx={{ minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <Box sx={{ p: 2.5, pb: 1.5, flexShrink: 0 }}>
             <Typography sx={{ fontSize: 15, fontWeight: 600 }}>
               {t('Resumo do dia', 'Day summary')}
             </Typography>
@@ -496,6 +496,8 @@ export function FechamentoCaixaPage() {
               {dataPainel ? ` · ${dataPainel}` : ''}
             </Typography>
           </Box>
+
+          <Box sx={{ px: 2.5, flex: 1, minHeight: 0, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
 
           <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
             <Metrica rotulo={t('Total', 'Total')} valor={brl(diaPainel ? totalDia(diaPainel) : 0)} />
@@ -540,24 +542,20 @@ export function FechamentoCaixaPage() {
               <LinhaPagamento tipo="dinheiro" cor="#EAB308" rotulo={t('Dinheiro em caixa', 'Cash in drawer')} valor={brl(diaPainel ? caixaGaveta(diaPainel) : 0)} />
             </Box>
           </Box>
+          </Box>
 
-          <Box sx={{ mt: 'auto', pt: 1 }}>
+          <Box sx={{ flexShrink: 0, px: 2.5, py: 1.5, borderTop: '1px solid', borderColor: 'divider' }}>
             {diaPainel && chegouDoPdv(diaPainel) && diaPainel.status === 'fechado' ? (
               <>
-                <Chip size="small" label={t('Caixa fechado', 'Cash closed')} variant="outlined" sx={{ mb: 1.5, color: tomMap.fechado.color, borderColor: tomMap.fechado.border, bgcolor: tomMap.fechado.bg }} />
+                <Chip size="small" label={t('Caixa fechado', 'Cash closed')} variant="outlined" sx={{ mb: 1, color: tomMap.fechado.color, borderColor: tomMap.fechado.border, bgcolor: tomMap.fechado.bg }} />
                 <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>
                   {t('PDV travado. Despesas lançadas. Só consulta.', 'POS locked. Expenses posted. View only.')}
                 </Typography>
               </>
             ) : diaPainel && chegouDoPdv(diaPainel) ? (
-              <>
-                <Typography sx={{ fontSize: 13, color: 'text.secondary', mb: 1.5 }}>
-                  {t('Vendas do PDV já vieram. Lance a despesa de caixa e feche o dia.', 'POS sales are in. Post cash expenses, then close the day.')}
-                </Typography>
-                <Button fullWidth variant="contained" onClick={() => setEditando(diaPainel)}>
-                  {t('Lançar despesa e fechar', 'Post expense and close')}
-                </Button>
-              </>
+              <Button fullWidth variant="contained" onClick={() => setEditando(diaPainel)}>
+                {t('Lançar despesa e fechar', 'Post expense and close')}
+              </Button>
             ) : diaPainel && diaPainel.data < hoje ? (
               <Typography sx={{ fontSize: 13, color: 'error.main' }}>
                 {t('O servidor não enviou as vendas deste dia.', 'The store did not send this day’s sales.')}
