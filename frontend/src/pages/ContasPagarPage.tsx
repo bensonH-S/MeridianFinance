@@ -44,7 +44,7 @@ const CODIGO: Record<string, string> = {
   folha: 'Folha', cadastro: 'Cadastro', chave_pix: 'Chave PIX',
   boleto: 'Boleto', guia: 'Guia', dinheiro: 'Dinheiro', online: 'Online',
 }
-const FILTROS = ['Todas', 'Para autorizar', 'Vencidas', 'NF confirmada'] as const
+const FILTROS = ['Todas', 'DDA', 'Boletos', 'Para autorizar', 'Vencidas', 'NF confirmada'] as const
 
 const TOM_CLARO: Record<string, { color: string; border: string; bg: string }> = {
   rascunho: { color: '#64748B', border: '#E2E8F0', bg: 'transparent' },
@@ -118,11 +118,30 @@ export function ContasPagarPage() {
   const [excluindo, setExcluindo] = useState(false)
   const [aviso, setAviso] = useState('')
   const [erroExcluir, setErroExcluir] = useState('')
+  const [erroBanco, setErroBanco] = useState('')
 
-  const carregar = (empresa = loja) => api.despesas(empresa || undefined).then(setDespesas).catch(() => setDespesas([]))
+  const carregar = (empresa = loja) => api.despesas(empresa || undefined).then((rows) => {
+    setDespesas(rows)
+    setErroBanco('')
+  }).catch(() => {
+    setDespesas([])
+    setErroBanco(t(
+      'Sem conexão com o Postgres de produção (meridian_finance). A lista de lojas e títulos fica vazia até a porta 5432 responder.',
+      'No connection to the production Postgres (meridian_finance). Stores and titles stay empty until port 5432 responds.',
+    ))
+  })
 
   useEffect(() => {
-    api.empresas().then(setEmpresas).catch(() => undefined)
+    api.empresas().then((rows) => {
+      setEmpresas(rows)
+      if (rows.length) setErroBanco('')
+    }).catch(() => {
+      setEmpresas([])
+      setErroBanco(t(
+        'Sem conexão com o Postgres de produção (meridian_finance). A lista de lojas e títulos fica vazia até a porta 5432 responder.',
+        'No connection to the production Postgres (meridian_finance). Stores and titles stay empty until port 5432 responds.',
+      ))
+    })
     carregar('')
   }, [])
 
@@ -137,6 +156,8 @@ export function ContasPagarPage() {
   const linhas = useMemo(() => noPeriodo.filter((e) => {
     const texto = `${e.descricao} ${e.fornecedor ?? ''} ${e.origem} ${e.plano ?? ''}`.toLowerCase()
     if (busca && !texto.includes(busca.toLowerCase())) return false
+    if (filtro === 'DDA') return e.fonte === 'dda'
+    if (filtro === 'Boletos') return e.forma_pagamento === 'boleto'
     if (filtro === 'Para autorizar') return e.status === 'pronta'
     if (filtro === 'Vencidas') return aberta(e) && !!e.vencimento && e.vencimento < hoje
     if (filtro === 'NF confirmada') return e.nf_confirmada
@@ -153,6 +174,7 @@ export function ContasPagarPage() {
 
   return (
     <Stack spacing={2} sx={{ height: '100%', minHeight: 0 }}>
+      {erroBanco && <Alert severity="warning">{erroBanco}</Alert>}
       <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} sx={{ alignItems: { md: 'center' } }}>
         <TextField size="small" placeholder={t('Buscar lançamento', 'Search entry')} value={busca} onChange={(ev) => setBusca(ev.target.value)} sx={{ minWidth: 280, bgcolor: 'background.paper' }} />
         <TextField size="small" label={t('De', 'From')} type="date" value={de} onChange={(ev) => setDe(ev.target.value)} slotProps={{ inputLabel: { shrink: true } }} sx={{ width: 150, bgcolor: 'background.paper' }} />
@@ -185,8 +207,8 @@ export function ContasPagarPage() {
           <Chip
             key={item}
             label={t(
-              item === 'Todas' ? 'Todas' : item === 'Para autorizar' ? 'Para autorizar' : item === 'Vencidas' ? 'Vencidas' : 'NF confirmada',
-              item === 'Todas' ? 'All' : item === 'Para autorizar' ? 'To authorize' : item === 'Vencidas' ? 'Overdue' : 'Invoice confirmed',
+              item === 'Todas' ? 'Todas' : item === 'DDA' ? 'DDA' : item === 'Boletos' ? 'Boletos' : item === 'Para autorizar' ? 'Para autorizar' : item === 'Vencidas' ? 'Vencidas' : 'NF confirmada',
+              item === 'Todas' ? 'All' : item === 'DDA' ? 'DDA' : item === 'Boletos' ? 'Boletos' : item === 'Para autorizar' ? 'To authorize' : item === 'Vencidas' ? 'Overdue' : 'Invoice confirmed',
             )}
             variant="outlined"
             onClick={() => { setFiltro(item); setPagina(0) }}
@@ -227,7 +249,14 @@ export function ContasPagarPage() {
                   <Chip size="small" label={idioma === 'en' ? rotulo[1] : rotulo[0]} variant="outlined" sx={{ height: 22, fontWeight: 500, color: tom.color, borderColor: tom.border, bgcolor: tom.bg }} />
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{e.descricao.trim() || t('Sem descrição', 'No description')}</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {(e.descricao || e.fornecedor || '').trim() || t('Sem descrição', 'No description')}
+                  </Typography>
+                  {e.descricao.trim() && e.fornecedor && e.fornecedor !== e.descricao.trim() ? (
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{e.fornecedor}</Typography>
+                  ) : e.origem ? (
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{e.origem}</Typography>
+                  ) : null}
                 </TableCell>
                 <TableCell>{e.origem}</TableCell>
                 <TableCell align="center" sx={{ verticalAlign: 'middle', width: 88, px: 0 }}>
@@ -241,7 +270,25 @@ export function ContasPagarPage() {
                       )}
                   </Box>
                 </TableCell>
-                <TableCell>{CODIGO[e.forma_pagamento || ''] || '—'}</TableCell>
+                <TableCell>
+                  {e.fonte === 'dda' ? (
+                    <Chip
+                      size="small"
+                      label="DDA"
+                      sx={{
+                        height: 22,
+                        fontWeight: 700,
+                        letterSpacing: '0.04em',
+                        bgcolor: escuro ? 'rgba(27,110,243,0.22)' : 'rgba(27,110,243,0.12)',
+                        color: escuro ? '#93C5FD' : '#0D4ECC',
+                        border: '1px solid',
+                        borderColor: escuro ? 'rgba(147,197,253,0.35)' : 'rgba(13,78,204,0.28)',
+                      }}
+                    />
+                  ) : (
+                    CODIGO[e.forma_pagamento || ''] || '—'
+                  )}
+                </TableCell>
                 <TableCell><Codigo forma={e.forma_pagamento} pagamento={e.pagamento} /></TableCell>
                 <TableCell sx={{ color: aberta(e) && e.vencimento && e.vencimento < hoje ? 'error.main' : 'inherit' }}>
                   {e.vencimento ? e.vencimento.split('-').reverse().join('/') : '—'}

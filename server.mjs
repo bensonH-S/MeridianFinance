@@ -54,14 +54,24 @@ function loadMeridianEnv() {
   return env
 }
 
+async function garantirSchemaFonte(db) {
+  await db.query(fs.readFileSync(path.join(root, 'db', '010_despesa_fonte.sql'), 'utf8'))
+}
+
 const env = loadMeridianEnv()
+const dbPort = Number(env.DB_PORT || 5432)
+const dbSsl = env.DB_SSL === 'true' || env.DB_SSL === '1' ? { rejectUnauthorized: false } : undefined
+console.log(`[db] meridian_finance @ ${env.DB_HOST}:${dbPort}${dbSsl ? ' (ssl)' : ''}`)
 const pool = new pg.Pool({
   host: env.DB_HOST,
   user: env.DB_USER,
   password: env.DB_PASS,
   database: 'meridian_finance',
-  port: Number(env.DB_PORT || 5432),
-  connectionTimeoutMillis: 10000,
+  port: dbPort,
+  connectionTimeoutMillis: 15000,
+  idleTimeoutMillis: 30000,
+  max: 8,
+  ssl: dbSsl,
 })
 
 const operacional = new pg.Pool({
@@ -69,9 +79,15 @@ const operacional = new pg.Pool({
   user: env.DB_USER,
   password: env.DB_PASS,
   database: env.DB_NAME || 'vision_check',
-  port: Number(env.DB_PORT || 5432),
-  connectionTimeoutMillis: 10000,
+  port: dbPort,
+  connectionTimeoutMillis: 15000,
+  idleTimeoutMillis: 30000,
+  max: 4,
+  ssl: dbSsl,
 })
+
+pool.on('error', (err) => console.error(`[db] pool: ${err.message}`))
+operacional.on('error', (err) => console.error(`[db] operacional: ${err.message}`))
 
 const FORMAS = new Set(['dinheiro', 'online', 'boleto', 'guia', 'folha', 'cadastro', 'chave_pix'])
 
@@ -79,6 +95,12 @@ const sessao = { nome: 'Felipe', papel: 'Autoriza' }
 let coletaVendas = null
 let coletaSfg = null
 let coletaBb = null
+let estadoBb = {
+  ok: false,
+  mensagem: 'A coleta do Banco do Brasil ainda não rodou.',
+  criadas: 0,
+  em: null,
+}
 let estadoSfg = {
   ok: false,
   mensagem: 'A coleta da VAN do Itaú ainda não rodou.',
@@ -143,13 +165,14 @@ async function lancarDda(selecionadas) {
   let criadas = 0
   for (const linha of prontas) {
     const status = linha.fornecedor_id ? 'classificada' : 'rascunho'
+    const descricao = String(linha.fornecedor || linha.cedente || '').trim().slice(0, 200)
     await pool.query(`
       insert into despesas (
         descricao, fornecedor_id, empresa_origem_id, plano_conta_id,
-        documento_ref, numero_nf, cnpj_cedente, competencia, vencimento, valor, forma_pagamento, dados_pagamento, status
-      ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'boleto',$11,$12)
+        documento_ref, numero_nf, cnpj_cedente, competencia, vencimento, valor, forma_pagamento, dados_pagamento, status, fonte
+      ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'boleto',$11,$12,'dda')
     `, [
-      '',
+      descricao,
       linha.fornecedor_id,
       linha.empresa_id,
       linha.plano_conta_id,
@@ -240,7 +263,12 @@ async function listarDespesas(empresaId) {
            er.apelido as registrado_em,
            d.fornecedor_id, f.nome as fornecedor, d.plano_conta_id, p.nome as plano,
            d.conta_saida_id, cs.nome as conta_nome, cs.empresa_id as conta_empresa_id,
-           coalesce(nullif(d.dados_pagamento, ''), pix.chave_pix) as pagamento
+           coalesce(nullif(d.dados_pagamento, ''), pix.chave_pix) as pagamento,
+           coalesce(d.fonte, case
+             when d.documento_ref like 'DDA|%' then 'dda'
+             when d.forma_pagamento = 'boleto' and d.documento_ref ~ '^\\d{44}$' then 'dda'
+             else 'manual'
+           end) as fonte
     from despesas d
     join empresas eo on eo.id = d.empresa_origem_id
     left join contas_bancarias cs on cs.id = d.conta_saida_id
@@ -515,8 +543,8 @@ const server = http.createServer(async (req, res) => {
       const inserted = await pool.query(`
         insert into despesas (
           descricao, fornecedor_id, empresa_origem_id, empresa_registro_id, conta_saida_id, plano_conta_id,
-          documento_ref, competencia, vencimento, valor, forma_pagamento, dados_pagamento, status
-        ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+          documento_ref, competencia, vencimento, valor, forma_pagamento, dados_pagamento, status, fonte
+        ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'manual')
         returning id, status
       `, [
         String(body.descricao).trim(),
@@ -691,6 +719,9 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && url.pathname === '/api/dda/sfg') {
       return send(res, 200, JSON.stringify(estadoSfg))
     }
+    if (req.method === 'GET' && url.pathname === '/api/dda/bb') {
+      return send(res, 200, JSON.stringify(estadoBb))
+    }
     if (req.method === 'GET' && url.pathname === '/api/config/itau') {
       const acesso = await lerItau(pool, env)
       return send(res, 200, JSON.stringify(acesso.publico))
@@ -758,12 +789,6 @@ const intervaloSfg = Number(process.env.ITAU_SFG_MS || 900000)
 const intervaloBb = Number(process.env.BB_DDA_MS || 900000)
 let avisouSfg = false
 let avisouBb = false
-let estadoBb = {
-  ok: false,
-  mensagem: 'A coleta do Banco do Brasil ainda não rodou.',
-  criadas: 0,
-  em: null,
-}
 
 async function cicloSfg() {
   if (coletaSfg) return
@@ -906,6 +931,7 @@ server.listen(port, '127.0.0.1', () => {
     setTimeout(cicloSfg, 12000)
     setInterval(cicloSfg, intervaloSfg)
   }
+  garantirSchemaFonte(pool).catch((err) => console.error(`[db] fonte: ${err.message}`))
   garantirSchemaBb(pool).catch((err) => console.error(`[bb] ${err.message}`))
   garantirSchemaItau(pool).catch((err) => console.error(`[sfg] ${err.message}`))
   garantirSchemaCaixa(pool).catch((err) => console.error(`[caixa] ${err.message}`))

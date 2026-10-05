@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
@@ -13,6 +14,7 @@ import TableCell from '@mui/material/TableCell'
 import TableHead from '@mui/material/TableHead'
 import TableRow from '@mui/material/TableRow'
 import Typography from '@mui/material/Typography'
+import RefreshOutlinedIcon from '@mui/icons-material/RefreshOutlined'
 import UploadFileOutlinedIcon from '@mui/icons-material/UploadFileOutlined'
 import { api, brl, type LinhaDda } from '../api'
 import { usePrefs } from '../prefs'
@@ -32,19 +34,31 @@ function dataBr(iso: string) {
   return `${dia}/${mes}/${ano}`
 }
 
+type EstadoColeta = { ok: boolean; mensagem: string; criadas: number; em: string | null }
+
 export function DdaPage() {
   const { t } = usePrefs()
+  const navigate = useNavigate()
   const input = useRef<HTMLInputElement>(null)
   const [linhas, setLinhas] = useState<LinhaDda[]>([])
   const [marcadas, setMarcadas] = useState<boolean[]>([])
   const [lendo, setLendo] = useState(false)
   const [subindo, setSubindo] = useState(false)
+  const [coletando, setColetando] = useState(false)
   const [erro, setErro] = useState('')
   const [aviso, setAviso] = useState('')
-  const [sfg, setSfg] = useState('')
+  const [sfg, setSfg] = useState<EstadoColeta | null>(null)
+  const [bb, setBb] = useState<EstadoColeta | null>(null)
+
+  const carregarEstados = () => {
+    api.sfgDda().then(setSfg).catch(() => setSfg(null))
+    api.bbDda().then(setBb).catch(() => setBb(null))
+  }
 
   useEffect(() => {
-    api.sfgDda().then((estado) => setSfg(estado.mensagem)).catch(() => setSfg(''))
+    carregarEstados()
+    const id = window.setInterval(carregarEstados, 8000)
+    return () => window.clearInterval(id)
   }, [])
 
   const prontas = linhas.filter((linha, indice) => linha.pronto && marcadas[indice])
@@ -86,12 +100,46 @@ export function DdaPage() {
     }
   }
 
+  const puxarBb = async () => {
+    setColetando(true)
+    setErro('')
+    try {
+      await api.coletarBb()
+      setAviso(t('Coleta do Banco do Brasil iniciada. Os títulos entram em Contas a pagar.', 'Banco do Brasil pull started. Titles land in Accounts payable.'))
+      window.setTimeout(carregarEstados, 2500)
+      window.setTimeout(carregarEstados, 8000)
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : t('Não iniciou a coleta', 'Could not start the pull'))
+    } finally {
+      setColetando(false)
+    }
+  }
+
   return (
     <Stack spacing={2} sx={{ height: '100%', minHeight: 0 }}>
-      <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} sx={{ alignItems: { md: 'center' } }}>
-        <Typography sx={{ color: 'text.secondary', fontSize: 14, flex: 1 }}>
-          {t('O Finance puxa o retorno de DDA na VAN do Itaú sozinho.', 'Finance pulls the Itaú DDA return from the VAN on its own.')} {sfg || t('Aguardando a coleta.', 'Waiting for the next pull.')}
-        </Typography>
+      <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} sx={{ alignItems: { md: 'flex-start' } }}>
+        <Stack spacing={0.75} sx={{ flex: 1, minWidth: 0 }}>
+          <Typography sx={{ color: 'text.secondary', fontSize: 14 }}>
+            {t(
+              'Os boletos do DDA (Itaú e Banco do Brasil) viram títulos em Contas a pagar.',
+              'DDA boletos (Itaú and Banco do Brasil) become payables in Accounts payable.',
+            )}
+          </Typography>
+          <Typography sx={{ color: 'text.secondary', fontSize: 13 }}>
+            <Box component="span" sx={{ fontWeight: 600, color: 'text.primary' }}>Itaú · </Box>
+            {sfg?.mensagem || t('Aguardando a coleta.', 'Waiting for the next pull.')}
+          </Typography>
+          <Typography sx={{ color: 'text.secondary', fontSize: 13 }}>
+            <Box component="span" sx={{ fontWeight: 600, color: 'text.primary' }}>BB · </Box>
+            {bb?.mensagem || t('Aguardando a coleta.', 'Waiting for the next pull.')}
+          </Typography>
+        </Stack>
+        <Button variant="outlined" onClick={() => navigate('/')}>
+          {t('Ver em Contas a pagar', 'Open Accounts payable')}
+        </Button>
+        <Button variant="outlined" startIcon={<RefreshOutlinedIcon />} disabled={coletando} onClick={puxarBb}>
+          {coletando ? t('Puxando BB…', 'Pulling BB…') : t('Puxar BB agora', 'Pull BB now')}
+        </Button>
         <Button variant="contained" startIcon={<UploadFileOutlinedIcon />} disabled={lendo} onClick={() => input.current?.click()}>
           {lendo ? t('Lendo…', 'Reading…') : t('Escolher arquivo', 'Choose file')}
         </Button>
@@ -116,7 +164,12 @@ export function DdaPage() {
             {linhas.length === 0 && (
               <TableRow>
                 <TableCell colSpan={6}>
-                  <Box sx={{ py: 6, textAlign: 'center', color: 'text.secondary' }}>{t('Nenhuma planilha carregada.', 'No file loaded.')}</Box>
+                  <Box sx={{ py: 6, textAlign: 'center', color: 'text.secondary' }}>
+                    {t(
+                      'Use “Puxar BB agora” ou suba um arquivo. Depois os títulos aparecem em Contas a pagar.',
+                      'Use “Pull BB now” or upload a file. Titles then show in Accounts payable.',
+                    )}
+                  </Box>
                 </TableCell>
               </TableRow>
             )}
@@ -154,7 +207,7 @@ export function DdaPage() {
         </Button>
       </Stack>
 
-      <Snackbar open={!!aviso} autoHideDuration={3200} onClose={() => setAviso('')} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+      <Snackbar open={!!aviso} autoHideDuration={4200} onClose={() => setAviso('')} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
         <Alert severity="success" variant="filled" onClose={() => setAviso('')}>{aviso}</Alert>
       </Snackbar>
     </Stack>

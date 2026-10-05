@@ -78,6 +78,8 @@ export type Despesa = {
   conta_nome: string | null
   conta_empresa_id: string | null
   pagamento: string | null
+  /** dda = veio do DDA (BB/Itaú/arquivo); manual = lançado na tela */
+  fonte: 'dda' | 'manual' | null
 }
 
 const apiRoot = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/api`
@@ -132,6 +134,7 @@ export type AcessoBb = {
   app_key: string
   segredo_definido: boolean
   certificado_definido: boolean
+  certificado_pasta?: boolean
   chave_definida: boolean
   ativo: boolean
   pronta: boolean
@@ -305,6 +308,7 @@ export const api = {
     return data as { id: string }
   },
   sfgDda: () => get<{ ok: boolean; mensagem: string; criadas: number; em: string | null }>(`${apiRoot}/dda/sfg`),
+  bbDda: () => get<{ ok: boolean; mensagem: string; criadas: number; em: string | null }>(`${apiRoot}/dda/bb`),
   previaDda: async (arquivo: string) => {
     const res = await fetch(`${apiRoot}/dda/previa`, {
       method: 'POST',

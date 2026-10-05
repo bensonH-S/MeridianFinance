@@ -5,7 +5,9 @@
   "scripts": {
     "start": "node server.mjs",
     "local": "node scripts/subir-local.mjs",
-    "vendas": "node scripts/sync-vendas-bk.mjs"
+    "prod": "node scripts/subir-local.mjs",
+    "vendas": "node scripts/sync-vendas-bk.mjs",
+    "dda:rei": "node scripts/ativar-bb-dda.mjs REI"
   },
   "dependencies": {
     "nfe-danfe-pdf": "^1.0.3",

@@ -70,7 +70,7 @@ export function AcessosBb() {
     { titulo: 'Empresa', render: (a) => <Titulo texto={a.empresa} sub={a.razao_social} /> },
     { titulo: 'CNPJ', render: (a) => <Box component="span" sx={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{cnpjFormatado(a.cnpj)}</Box> },
     { titulo: 'Ambiente', render: (a) => (a.cadastrada ? (a.ambiente === 'producao' ? 'Produção' : 'Homologação') : '—') },
-    { titulo: 'Certificado', render: (a) => (a.certificado_definido ? 'A1 carregado' : '—') },
+    { titulo: 'Certificado', render: (a) => (a.certificado_definido ? (a.certificado_pasta ? 'A1 na pasta' : 'A1 carregado') : '—') },
     { titulo: 'Situação', render: (a) => { const s = situacao(a); return <Selo texto={s.texto} tom={s.tom} /> } },
     {
       titulo: 'Última consulta',
@@ -263,7 +263,9 @@ function FormAcesso({ acesso, onFechar, onSalvo }: { acesso: AcessoBb; onFechar:
           autoComplete="new-password"
           value={form.cert_pass}
           onChange={(ev) => setForm({ ...form, cert_pass: ev.target.value })}
-          helperText="Obrigatório em produção. Homologação consulta sem certificado."
+          helperText={acesso.certificado_pasta
+            ? 'A1 já está na pasta Certificados desta empresa. Só a senha, se for produção.'
+            : 'Obrigatório em produção. Homologação consulta sem certificado.'}
         />
       </Secao>
 
