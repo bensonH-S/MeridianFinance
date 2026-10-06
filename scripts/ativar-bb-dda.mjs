@@ -1,17 +1,85 @@
-// Grava o acesso BB de produção (REI) e dispara a coleta.
-// Uso (com a API local no ar — npm run local):
-//   node scripts/ativar-bb-dda.mjs
-//   node scripts/ativar-bb-dda.mjs REI
-//   node scripts/ativar-bb-dda.mjs REI "API BB/credenciais-dda-rei.txt"
+// Grava acesso BB de produção e dispara a coleta de uma loja.
+// Uso (API local no ar — npm run local):
+//   node scripts/ativar-bb-dda.mjs IMPERADOR
+//   node scripts/ativar-bb-dda.mjs LORD
+//
+// Credenciais: API BB/Credenciais/credenciais-{LOJA}.txt
+// Certificado: pasta Certificados/*.pfx (senha Diag2026)
 
+import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const api = 'http://127.0.0.1:5080/api'
-const filtro = (process.argv[2] || 'REI').trim().toLowerCase()
-const arquivo = path.resolve(root, process.argv[3] || path.join('API BB', 'credenciais-dda-rei.txt'))
+const filtro = (process.argv[2] || '').trim()
+if (!filtro) {
+  console.error('Uso: node scripts/ativar-bb-dda.mjs IMPERADOR')
+  process.exit(1)
+}
+
+function digitos(valor) {
+  return String(valor || '').replace(/\D/g, '')
+}
+
+function acharArquivoCredencial(nome) {
+  const chave = nome.trim().toUpperCase().normalize('NFD').replace(/\p{M}/gu, '')
+  const pasta = path.join(root, 'API BB', 'Credenciais')
+  const legado = [
+    path.join(root, 'API BB', `credenciais-${chave}.txt`),
+    path.join(root, 'API BB', 'credenciais-dda-rei.txt'),
+  ]
+  if (process.argv[3]) return path.resolve(root, process.argv[3])
+  if (fs.existsSync(pasta)) {
+    const arquivos = fs.readdirSync(pasta).filter((f) => f.toLowerCase().endsWith('.txt'))
+    const hit = arquivos.find((f) => {
+      const base = f.replace(/^credenciais-/i, '').replace(/\.txt$/i, '')
+      const limpo = base.toUpperCase().normalize('NFD').replace(/\p{M}/gu, '')
+      return limpo === chave
+    })
+    if (hit) return path.join(pasta, hit)
+  }
+  return legado.find((p) => fs.existsSync(p)) || ''
+}
+
+function acharPfx(cnpj) {
+  const pasta = path.join(root, 'Certificados')
+  if (!fs.existsSync(pasta)) return ''
+  const chave = digitos(cnpj)
+  const nome = fs.readdirSync(pasta).find((item) => {
+    const baixo = item.toLowerCase()
+    if (!baixo.endsWith('.pfx') && !baixo.endsWith('.p12')) return false
+    const docs = digitos(item)
+    return docs === chave || docs.includes(chave)
+  })
+  return nome ? path.join(pasta, nome) : ''
+}
+
+function extrairPem(pfxPath, senha) {
+  if (!pfxPath) return null
+  // PFX ICP-Brasil (RC2) — OpenSSL 3 do Git falha sem legacy.dll; Python cryptography lê.
+  const script = path.join(root, 'scripts', '_extrair_pfx.py')
+  const runners = [
+    ['py', ['-3', script, pfxPath, senha]],
+    ['python', [script, pfxPath, senha]],
+  ]
+  for (const [bin, args] of runners) {
+    try {
+      const texto = execFileSync(bin, args, { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 })
+      const marca = '-----BEGIN PRIVATE KEY-----'
+      const i = texto.indexOf(marca)
+      if (i < 0) continue
+      const cert = texto.slice(0, i).trim() + '\n'
+      const key = texto.slice(i).trim() + '\n'
+      if (!cert.includes('BEGIN CERTIFICATE')) continue
+      return { cert_pem: cert, key_pem: key }
+    } catch {
+      /* tenta próximo */
+    }
+  }
+  return null
+}
 
 function lerCredenciais(caminho) {
   const dados = {}
@@ -28,10 +96,7 @@ function lerCredenciais(caminho) {
   } catch {
     /* ignore */
   }
-  const certDir = path.join(root, 'API BB', 'certs-rei')
-  const crt = path.join(certDir, 'rei.crt')
-  const key = path.join(certDir, 'rei.key')
-  const body = {
+  return {
     ambiente,
     client_id: dados.clientID || dados.client_id || '',
     client_secret: secret,
@@ -39,11 +104,6 @@ function lerCredenciais(caminho) {
     cert_pass: dados.certPass || dados.cert_pass || 'Diag2026',
     ativo: true,
   }
-  if (fs.existsSync(crt) && fs.existsSync(key)) {
-    body.cert_pem = fs.readFileSync(crt, 'utf8')
-    body.key_pem = fs.readFileSync(key, 'utf8')
-  }
-  return body
 }
 
 async function json(url, opts) {
@@ -53,22 +113,29 @@ async function json(url, opts) {
   return body
 }
 
-if (!fs.existsSync(arquivo)) {
-  console.error('Arquivo de credenciais não encontrado:', arquivo)
+const arquivo = acharArquivoCredencial(filtro)
+if (!arquivo || !fs.existsSync(arquivo)) {
+  console.error('Arquivo de credenciais não encontrado para', filtro)
   process.exit(1)
 }
 
 const body = lerCredenciais(arquivo)
 if (!body.client_id || !body.client_secret || !body.app_key) {
-  console.error('Credenciais incompletas.')
+  console.error('Credenciais incompletas em', path.basename(arquivo))
   process.exit(1)
 }
 
+function nomeLoja(texto) {
+  return String(texto || '').toUpperCase().normalize('NFD').replace(/\p{M}/gu, '').replace(/[\s._-]+/g, '')
+}
+
 const acessos = await json(`${api}/config/bb`)
+const chave = nomeLoja(filtro)
 const candidatos = acessos.filter((a) => {
-  const texto = `${a.empresa} ${a.razao_social} ${a.cnpj || ''}`
-  return texto.toLowerCase().includes(filtro)
-})
+  const apelido = nomeLoja(a.empresa)
+  const razao = nomeLoja(a.razao_social)
+  return apelido === chave || apelido.startsWith(`${chave}ALVIM`) || razao.startsWith(chave)
+}).sort((a, b) => nomeLoja(a.empresa).length - nomeLoja(b.empresa).length)
 
 if (!candidatos.length) {
   console.error('Nenhuma empresa bateu com o filtro. Empresas:')
@@ -77,6 +144,20 @@ if (!candidatos.length) {
 }
 
 const alvo = candidatos[0]
+const pfx = acharPfx(alvo.cnpj)
+if (pfx) {
+  const pem = extrairPem(pfx, body.cert_pass)
+  if (pem) {
+    body.cert_pem = pem.cert_pem
+    body.key_pem = pem.key_pem
+    console.log('A1:', path.basename(pfx), '→ PEM')
+  } else {
+    console.log('A1:', path.basename(pfx), '(PEM não extraído; tenta PFX na coleta)')
+  }
+} else {
+  console.log('Aviso: sem PFX na pasta Certificados para', alvo.empresa)
+}
+
 console.log('Empresa:', alvo.empresa)
 console.log('Arquivo:', path.basename(arquivo))
 console.log('Ambiente:', body.ambiente)
@@ -90,9 +171,9 @@ console.log('Acesso gravado.')
 
 await json(`${api}/config/bb/coletar`, { method: 'POST' })
 console.log('Coleta disparada. Aguardando…')
-await new Promise((r) => setTimeout(r, 12000))
+await new Promise((r) => setTimeout(r, 18000))
 
 const depois = (await json(`${api}/config/bb`)).find((a) => a.empresa_id === alvo.empresa_id)
 console.log('Situação:', depois?.ultimo_ok === true ? 'ok' : depois?.ultimo_ok === false ? 'erro' : 'sem status')
 console.log('Mensagem:', depois?.ultima_mensagem || '—')
-console.log('Títulos em Contas a pagar: http://127.0.0.1:5176/')
+console.log('Títulos: http://127.0.0.1:5176/')

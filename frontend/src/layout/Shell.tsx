@@ -20,6 +20,7 @@ import AssessmentOutlinedIcon from '@mui/icons-material/AssessmentOutlined'
 import HubOutlinedIcon from '@mui/icons-material/HubOutlined'
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined'
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined'
+import { AzimutMarca } from '../brand/AzimutMarca'
 
 const grupos = [
   {
@@ -84,7 +85,7 @@ export function Shell() {
 
   return (
     <ThemeProvider theme={escuro ? temaEscuro : pagar ? temaPagar : theme}>
-    <Box className={escuro ? 'tema-escuro' : pagar ? 'tema-pagar' : undefined} sx={{ display: 'flex', height: '100%', bgcolor: 'background.default', overflow: 'hidden' }}>
+    <Box className={escuro ? 'tema-escuro' : pagar ? 'tema-pagar' : 'tema-claro'} sx={{ display: 'flex', height: '100%', bgcolor: 'background.default', overflow: 'hidden' }}>
       <Box
         component="aside"
         sx={{
@@ -92,19 +93,14 @@ export function Shell() {
           flexShrink: 0,
           bgcolor: 'var(--ga-sidebar-bg)',
           borderRight: '1px solid',
-          borderColor: 'divider',
+          borderColor: 'var(--ga-sidebar-border)',
           display: 'flex',
           flexDirection: 'column',
           height: '100%',
         }}
       >
-        <Box sx={{ px: 1.25, pt: 1.75, pb: 0.75 }}>
-          <Box
-            component="img"
-            src={`${import.meta.env.BASE_URL}logo-azimut.png?v=5`}
-            alt="Azimut"
-            sx={{ width: '100%', height: 'auto', display: 'block' }}
-          />
+        <Box sx={{ px: 2, pt: 2, pb: 1.25, flexShrink: 0 }}>
+          <AzimutMarca />
         </Box>
 
         <Box component="nav" sx={{ flex: 1, px: 1.25, py: 1.75, overflowY: 'auto' }}>
@@ -139,7 +135,7 @@ export function Shell() {
                           borderRadius: '8px',
                           fontSize: 13,
                           fontWeight: 500,
-                          color: ativo ? 'var(--ga-sidebar-active-text)' : 'var(--ga-text-primary)',
+                          color: ativo ? 'var(--ga-sidebar-active-text)' : 'var(--ga-sidebar-text)',
                           bgcolor: ativo ? 'var(--ga-sidebar-active-bg)' : 'transparent',
                           borderLeft: '3px solid',
                           borderColor: ativo ? 'var(--ga-sidebar-active-border)' : 'transparent',
@@ -148,7 +144,7 @@ export function Shell() {
                           },
                           '& .MuiSvgIcon-root': {
                             fontSize: 17,
-                            color: ativo ? 'var(--ga-sidebar-active-icon)' : 'var(--ga-text-primary)',
+                            color: ativo ? 'var(--ga-sidebar-active-icon)' : 'var(--ga-sidebar-text)',
                           },
                         }}
                       >
@@ -162,7 +158,7 @@ export function Shell() {
             </Box>
           ))}
         </Box>
-        <Box sx={{ px: 1.5, py: 1.5, borderTop: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1.25 }}>
+        <Box sx={{ px: 1.5, py: 1.5, borderTop: '1px solid', borderColor: 'var(--ga-sidebar-border)', display: 'flex', alignItems: 'center', gap: 1.25 }}>
           <Box
             aria-hidden
             sx={{

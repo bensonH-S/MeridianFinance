@@ -24,6 +24,8 @@
   --ga-sidebar-hover: #f3f4f6;
   --ga-sidebar-text: #111827;
   --ga-sidebar-muted: #6b7280;
+  --ga-marca-titulo: #07151C;
+  --ga-marca-subtitulo: #64748B;
   --ga-success: #059669;
   --ga-warning: #d97706;
   --ga-danger: #dc2626;
@@ -34,6 +36,23 @@ body,
 #root {
   height: 100%;
   margin: 0;
+}
+
+.tema-claro {
+  --ga-sidebar-bg: #051017;
+  --ga-sidebar-border: rgba(255, 255, 255, 0.08);
+  --ga-sidebar-active-bg: rgba(27, 110, 243, 0.16);
+  --ga-sidebar-active-text: #ffffff;
+  --ga-sidebar-active-border: #1b6ef3;
+  --ga-sidebar-active-icon: #1b6ef3;
+  --ga-sidebar-hover: rgba(255, 255, 255, 0.06);
+  --ga-sidebar-text: #f8fafc;
+  --ga-sidebar-muted: #94a3b8;
+}
+
+.tema-claro aside {
+  --ga-marca-titulo: #F2F4F3;
+  --ga-marca-subtitulo: #93A4A9;
 }
 
 .tema-pagar {
@@ -54,6 +73,8 @@ body,
   --ga-sidebar-text: #f8fafc;
   --ga-sidebar-muted: #94a3b8;
   --ga-logo-plate: #031720;
+  --ga-marca-titulo: #F2F4F3;
+  --ga-marca-subtitulo: #93A4A9;
   color-scheme: light;
 }
 
@@ -75,6 +96,8 @@ body,
   --ga-sidebar-text: #f8fafc;
   --ga-sidebar-muted: #94a3b8;
   --ga-logo-plate: #031720;
+  --ga-marca-titulo: #F2F4F3;
+  --ga-marca-subtitulo: #93A4A9;
   color-scheme: dark;
 }
 
