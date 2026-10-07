@@ -1,11 +1,10 @@
-// Sobe a aplicação local apontando para o Postgres de produção (meridian_finance).
+// Sobe a API Finance local apontando para vision_check.finance (mesmo DB Meridian).
 // Lê DB_* do .env desta pasta ou de ../Check_visaodono/backend/.env
 //
 // Uso, na raiz do repositório:
 //   npm run local
 //   npm run prod
 //
-// Tela: http://127.0.0.1:5176/
 // API:  http://127.0.0.1:5080/
 
 import { spawn } from 'node:child_process'
@@ -89,10 +88,9 @@ if (await portaLivre(5176)) {
 }
 
 console.log('')
-console.log('Meridian Finance · local + banco produção')
-console.log('Tela  http://127.0.0.1:5176/')
+console.log('Meridian Finance · local + vision_check.finance')
 console.log('API   http://127.0.0.1:5080/')
-console.log(`Banco ${env.DB_HOST}:${env.DB_PORT || 5432} / meridian_finance`)
+console.log(`Banco ${env.DB_HOST}:${env.DB_PORT || 5432} / vision_check.finance`)
 console.log(`Env   ${arquivo}`)
 console.log('')
 console.log('DDA BB: depois de subir, rode  node scripts/ativar-bb-dda.mjs REI')

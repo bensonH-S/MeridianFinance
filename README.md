@@ -2,13 +2,17 @@
 
 **Financeiro, pagamentos, aprovações e conciliação**
 
-Sistema financeiro do Grupo Alvim. Produto separado do Meridian operacional e do ImpSheet.
+Domínio financeiro do Grupo Alvim. A **UI do dia a dia** é o módulo **Financeiro** no portal Meridian (`Check_visaodono` → `/financeiro/*`). Este repo é a API, scripts e docs.
 
-Este repositório começa limpo de propósito. O ImpSheet continua com automações de planilha e o mockup antigo. O Meridian (`Check_visaodono`) continua operacional. O FreeControl continua com folha e pessoas.
+## Uso diário
+
+1. Portal Meridian (UI + sessão)
+2. API deste repo na porta **5080** (`npm start`) — proxy `/api/financeiro/*`
+3. Ver [docs/CUTOVER.md](docs/CUTOVER.md)
+
+Não use o Vite isolado (`5176`) no fluxo diário.
 
 ## O que este sistema é
-
-Ciclo financeiro:
 
 documento / evento operacional → obrigação → vencimento → classificação → aprovação → pagamento → conciliação
 
@@ -16,25 +20,16 @@ documento / evento operacional → obrigação → vencimento → classificaçã
 
 - Não é o Meridian operacional (estoque, NF de entrada, operação da loja)
 - Não é o FreeControl (ponto, folha, PIX da pessoa)
-- Não é o F360 (só usamos o plano de contas como referência)
 - A IA não movimenta dinheiro sozinha. Ela prepara. O financeiro revisa. O Felipe autoriza.
-
-## Relação com os outros sistemas
-
-| Sistema | Papel |
-|---|---|
-| Meridian | Operação. Ex.: NF recebida na loja |
-| FreeControl | Pessoas e labor. Ex.: lote FREE / folha |
-| Meridian Finance | Obrigação de pagar, aprovação, pagamento, conciliação |
-
-Loja se identifica por `bk_number`. Origem da despesa não é necessariamente a conta que paga.
 
 ## Banco
 
-Database `meridian_finance` na mesma instância Postgres do Meridian. Sem foreign key para tabelas do Meridian. Sem schema dentro de `vision_check`.
+Schema **`finance`** em `vision_check` (mesma instância). Sem FK para `public` operacional.
 
-Detalhe das decisões: [docs/ARQUITETURA.md](docs/ARQUITETURA.md). Esquema do núcleo: [docs/BANCO.md](docs/BANCO.md).
+```bash
+npm run migrate:finance-schema
+```
 
-## Status
+Legacy: `FINANCE_DB_NAME=meridian_finance` + `FINANCE_SCHEMA=0`.
 
-Contas a pagar em `http://127.0.0.1:5080` (`npm start`). Database `meridian_finance` com empresas, contas, plano e fornecedores. A despesa nasce como rascunho nessa tela.
+Detalhe: [docs/ARQUITETURA.md](docs/ARQUITETURA.md) · [docs/BANCO.md](docs/BANCO.md) · [docs/CUTOVER.md](docs/CUTOVER.md).

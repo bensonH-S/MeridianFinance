@@ -1,6 +1,8 @@
 # Banco — núcleo
 
-Database `meridian_finance`. Sem foreign key para o Meridian. Script: `db/001_nucleo.sql`.
+Schema **`finance`** no database **`vision_check`** (mesma instância do Meridian operacional). Sem foreign key para `public`. Scripts: `db/001_nucleo.sql` … (aplicados com `search_path=finance,public`).
+
+Legacy: database `meridian_finance`. Cutover: `scripts/migrar-para-schema-finance.mjs`.
 
 As planilhas e o PDF ficam na pasta `Dados Grupo Alvim/`, fora do Git. Elas têm conta, CPF e chave PIX.
 

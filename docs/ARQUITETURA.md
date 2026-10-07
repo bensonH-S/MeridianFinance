@@ -16,15 +16,21 @@ Fronteira:
 
 Operacional não marca pago. Financeiro não dá entrada de estoque.
 
-## 2. Banco — opção B
+## 2. Banco — schema `finance` em `vision_check`
 
 | Opção | Veredito |
 |---|---|
-| A. mesmo database + schemas (`vision_check.finance.*`) | Não |
-| B. database `meridian_finance` na mesma instância Postgres | Sim |
+| A. mesmo database + schema `vision_check.finance.*` | **Sim (cutover atual)** |
+| B. database `meridian_finance` separado | Legacy — só até migrar (`FINANCE_DB_NAME=meridian_finance` + `FINANCE_SCHEMA=0`) |
 | C. instância/cloud à parte + só API | Depois, se o produto crescer |
 
-IDs externos (`bk_number`, `nfe_id`, `employee_id`) + snapshot. Nunca JOIN nas tabelas do Meridian.
+UI: módulo **Financeiro** no portal Meridian (`/financeiro/*`), chrome Azimut, nome Meridian.
+
+Pool Finance: `DB_NAME` (ou `FINANCE_DB_NAME`) + `search_path=finance,public`.
+
+IDs externos (`bk_number`, `nfe_id`, `employee_id`) + snapshot. **Sem FK** para tabelas `public` do operacional.
+
+Migração: `Check_visaodono` migration `191_finance_schema.sql` + `node scripts/migrar-para-schema-finance.mjs`.
 
 Integração no começo: HTTP autenticado + outbox no emissor. Sem event bus no MVP.
 

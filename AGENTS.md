@@ -2,13 +2,13 @@
 
 Financeiro, pagamentos, aprovações e conciliação.
 
-Produto financeiro do Grupo Alvim. Repositório próprio — não misturar com ImpSheet, Meridian operacional (`Check_visaodono`) ou FreeControl.
+Módulo do portal **Meridian** (`Check_visaodono` → `/financeiro/*`). Este repo permanece como API/lib e scripts de migração — **não** use o Vite isolado no dia a dia.
 
-- Meridian: operação (estoque, NF, loja)
+- Meridian: operação (estoque, NF, loja) + shell do portal
 - FreeControl: pessoas e labor
-- Meridian Finance: obrigação, aprovação, pagamento, conciliação
+- Financeiro (este domínio): obrigação, aprovação, pagamento, conciliação — schema `vision_check.finance`
 - IA prepara. Financeiro revisa. Felipe autoriza. IA não move dinheiro.
 
-Banco previsto: `meridian_finance` na mesma instância Postgres, sem FK para o Meridian.
+Banco: schema **`finance`** em `vision_check`, sem FK para o operacional.
 
-Decisões: `docs/ARQUITETURA.md`.
+Decisões: `docs/ARQUITETURA.md`. Cutover: `docs/CUTOVER.md`.

@@ -61,17 +61,26 @@ async function garantirSchemaFonte(db) {
 const env = loadMeridianEnv()
 const dbPort = Number(env.DB_PORT || 5432)
 const dbSsl = env.DB_SSL === 'true' || env.DB_SSL === '1' ? { rejectUnauthorized: false } : undefined
-console.log(`[db] meridian_finance @ ${env.DB_HOST}:${dbPort}${dbSsl ? ' (ssl)' : ''}`)
+const financeDb = process.env.FINANCE_DB_NAME || env.FINANCE_DB_NAME || env.DB_NAME || 'vision_check'
+const financeSchemaFlag = process.env.FINANCE_SCHEMA ?? env.FINANCE_SCHEMA
+const useFinanceSchema =
+  financeDb !== 'meridian_finance' &&
+  financeSchemaFlag !== '0' &&
+  financeSchemaFlag !== 'false'
+console.log(`[db] ${financeDb}${useFinanceSchema ? '.finance' : ''} @ ${env.DB_HOST}:${dbPort}${dbSsl ? ' (ssl)' : ''}`)
 const pool = new pg.Pool({
   host: env.DB_HOST,
   user: env.DB_USER,
   password: env.DB_PASS,
-  database: 'meridian_finance',
+  database: financeDb,
   port: dbPort,
   connectionTimeoutMillis: 15000,
   idleTimeoutMillis: 30000,
   max: 8,
   ssl: dbSsl,
+  ...(useFinanceSchema
+    ? { options: '-c search_path=finance,public' }
+    : {}),
 })
 
 const operacional = new pg.Pool({
@@ -338,6 +347,30 @@ const server = http.createServer(async (req, res) => {
   try {
     if (req.method === 'GET' && url.pathname === '/api/sistema') {
       return send(res, 200, JSON.stringify({ versao, usuario: sessao }))
+    }
+    if (req.method === 'GET' && url.pathname === '/api/resumo') {
+      const hoje = new Date().toISOString().slice(0, 10)
+      const { rows } = await pool.query(
+        `
+        select
+          coalesce(sum(case when status not in ('paga','conciliada','cancelada') then valor else 0 end), 0)::float8 as a_pagar,
+          coalesce(sum(case when status in ('paga','conciliada') then valor else 0 end), 0)::float8 as pago,
+          coalesce(sum(case when status = 'pronta' then valor else 0 end), 0)::float8 as para_autorizar,
+          coalesce(sum(case
+            when status not in ('paga','conciliada','cancelada')
+             and vencimento is not null and vencimento < $1::date
+            then valor else 0 end), 0)::float8 as vencida,
+          count(*) filter (where status not in ('paga','conciliada','cancelada'))::int as qtd_abertas,
+          count(*) filter (where status = 'pronta')::int as qtd_autorizar,
+          count(*) filter (
+            where status not in ('paga','conciliada','cancelada')
+              and vencimento is not null and vencimento < $1::date
+          )::int as qtd_vencidas
+        from despesas
+        `,
+        [hoje],
+      )
+      return send(res, 200, JSON.stringify({ ...rows[0], banco: financeDb, schema: useFinanceSchema ? 'finance' : 'public' }))
     }
     if (req.method === 'GET' && url.pathname === '/api/despesas') {
       return send(res, 200, JSON.stringify(await listarDespesas(url.searchParams.get('empresa') || '')))
