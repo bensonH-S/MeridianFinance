@@ -241,19 +241,34 @@ async function amarrarNotas() {
     left join fornecedores f on f.id = d.fornecedor_id
     where d.nf_confirmada = false and d.numero_nf is not null and d.status <> 'cancelada'
   `)
-  if (!despesas.rowCount) return
-  const notas = await operacional.query(`
-    select n.id_nfe::text as id, n.numero, n.emitente_cnpj, l.cnpj as cnpj_loja
-    from estoque_nfe n
-    join lojas l on l.id_loja = n.id_loja
-    where n.status_entrega = 'conferida'
-  `)
-  for (const cruzamento of cruzarNotas(despesas.rows, notas.rows)) {
-    await pool.query(
-      `update despesas set nf_confirmada = true, nfe_id = $2 where id = $1 and nf_confirmada = false`,
-      [cruzamento.despesa_id, cruzamento.nfe_id],
-    )
+  if (despesas.rowCount) {
+    const notas = await operacional.query(`
+      select n.id_nfe::text as id, n.numero, n.emitente_cnpj, l.cnpj as cnpj_loja
+      from estoque_nfe n
+      join lojas l on l.id_loja = n.id_loja
+      where n.status_entrega = 'conferida'
+    `)
+    for (const cruzamento of cruzarNotas(despesas.rows, notas.rows)) {
+      // Gestor conferiu a NF no app → título vai sozinho para a Agenda banco (pronta).
+      await pool.query(
+        `update despesas set
+           nf_confirmada = true,
+           nfe_id = $2,
+           status = case
+             when status in ('rascunho', 'classificada', 'bloqueada_duplicata') then 'pronta'
+             else status
+           end
+         where id = $1 and nf_confirmada = false`,
+        [cruzamento.despesa_id, cruzamento.nfe_id],
+      )
+    }
   }
+  // Já tinham NF conferida e ainda estavam no inbox (legado / corrida).
+  await pool.query(`
+    update despesas set status = 'pronta'
+    where nf_confirmada = true
+      and status in ('rascunho', 'classificada', 'bloqueada_duplicata')
+  `)
 }
 
 async function listarDespesas(empresaId) {
@@ -595,6 +610,44 @@ const server = http.createServer(async (req, res) => {
         status,
       ])
       return send(res, 201, JSON.stringify(inserted.rows[0]))
+    }
+    if (req.method === 'POST' && url.pathname === '/api/despesas/agenda') {
+      const body = await readBody(req)
+      const ids = Array.isArray(body.ids) ? body.ids.map(String).filter(Boolean) : []
+      if (!ids.length) return send(res, 400, JSON.stringify({ erro: 'Informe ao menos um título.' }))
+      await amarrarNotas()
+      const { rows } = await pool.query(
+        `select id, fonte, nf_confirmada, status from despesas where id = any($1::uuid[])`,
+        [ids],
+      )
+      const porId = new Map(rows.map((r) => [r.id, r]))
+      const enviados = []
+      const bloqueados = []
+      for (const id of ids) {
+        const d = porId.get(id)
+        if (!d) {
+          bloqueados.push({ id, motivo: 'Título não encontrado.' })
+          continue
+        }
+        if (['paga', 'conciliada', 'cancelada'].includes(d.status)) {
+          bloqueados.push({ id, motivo: `Já está ${d.status}.` })
+          continue
+        }
+        if (['pronta', 'autorizada', 'enviada'].includes(d.status)) {
+          enviados.push({ id, status: d.status })
+          continue
+        }
+        if (d.fonte === 'dda' && !d.nf_confirmada) {
+          bloqueados.push({ id, motivo: 'NF ainda não conferida no estoque pelo gestor.' })
+          continue
+        }
+        const up = await pool.query(
+          `update despesas set status = 'pronta' where id = $1 returning id, status`,
+          [id],
+        )
+        enviados.push(up.rows[0])
+      }
+      return send(res, 200, JSON.stringify({ enviados, bloqueados }))
     }
     if (req.method === 'PATCH' && url.pathname.startsWith('/api/despesas/')) {
       const id = url.pathname.split('/').pop()
